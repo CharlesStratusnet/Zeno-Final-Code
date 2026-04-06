@@ -1,5 +1,7 @@
 //! JSON-RPC server with full Ethereum/MetaMask compatibility.
 
+mod pages;
+
 use std::{
     collections::HashMap,
     net::{IpAddr, SocketAddr},
@@ -73,6 +75,15 @@ pub trait RpcProvider: Send + Sync + 'static {
     async fn eth_gas_price(&self) -> Result<u128>;
     /// Sends a raw ECDSA-signed Ethereum transaction.
     async fn eth_send_raw_transaction(&self, raw_hex: String) -> Result<zeno_hash::Hash32>;
+    // -- Explorer, staking, faucet, governance methods --
+    /// Returns recent blocks (up to `count` from the tip).
+    async fn get_recent_blocks(&self, count: u64) -> Result<Vec<FinalizedBlock>>;
+    /// Returns staking state.
+    async fn get_staking_state(&self) -> Result<zeno_types::StakingState>;
+    /// Returns governance state.
+    async fn get_governance_state(&self) -> Result<zeno_types::GovernanceState>;
+    /// Sends faucet tokens to an address.
+    async fn faucet_send(&self, recipient: Address, amount: u128) -> Result<()>;
     /// Returns Prometheus metrics text.
     async fn metrics(&self) -> Result<String>;
 }
@@ -147,6 +158,12 @@ pub async fn serve(listen: SocketAddr, provider: Arc<dyn RpcProvider>) -> Result
     let app = Router::new()
         .route("/", get(handle_explorer).post(handle_rpc))
         .route("/explorer", get(handle_explorer))
+        .route("/explorer/block/{height}", get(handle_block_page))
+        .route("/explorer/tx/{hash}", get(handle_tx_page))
+        .route("/explorer/address/{address}", get(handle_address_page))
+        .route("/staking", get(handle_staking_page))
+        .route("/governance", get(handle_governance_page))
+        .route("/faucet", get(handle_faucet_page))
         .route("/health", get(handle_health))
         .route("/metrics", get(handle_metrics))
         .with_state(state)
@@ -189,77 +206,116 @@ async fn handle_metrics(State(state): State<RpcState>) -> impl IntoResponse {
 }
 
 async fn handle_explorer(State(state): State<RpcState>) -> impl IntoResponse {
-    let status = state.provider.get_chain_status().await;
-    let latest = state.provider.get_latest_block().await;
     let chain_id = state.provider.eth_chain_id().await.ok().flatten().unwrap_or(0);
-    match (status, latest) {
-        (Ok(status), Ok(latest)) => {
-            let height = latest.as_ref().map(|b| b.block.header.height).unwrap_or(0);
-            let hash = latest.as_ref().map(|b| b.block.hash().to_string()).unwrap_or_else(|| "none".to_string());
-            let peers = status.peers.len();
-            Html(format!(
-r#"<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{network} Explorer</title>
-<style>
-*{{margin:0;padding:0;box-sizing:border-box}}
-body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0a0a0f;color:#e0e0e0;padding:2rem}}
-h1{{font-size:2rem;margin-bottom:.5rem;background:linear-gradient(135deg,#6366f1,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent}}
-.subtitle{{color:#888;margin-bottom:2rem}}
-.grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;margin-bottom:2rem}}
-.card{{background:#16161e;border:1px solid #2a2a3a;border-radius:12px;padding:1.5rem}}
-.card h3{{color:#888;font-size:.75rem;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem}}
-.card .value{{font-size:1.5rem;font-weight:700;color:#fff}}
-.card .mono{{font-family:'SF Mono',Monaco,monospace;font-size:.85rem;word-break:break-all;color:#a5b4fc}}
-.metamask{{background:#1a1a2e;border:1px solid #3b3b5c;border-radius:12px;padding:2rem;margin-top:1rem}}
-.metamask h2{{font-size:1.2rem;margin-bottom:1rem;color:#f59e0b}}
-table{{width:100%;border-collapse:collapse}}
-td{{padding:.4rem .8rem;border-bottom:1px solid #2a2a3a;font-family:'SF Mono',Monaco,monospace;font-size:.85rem}}
-td:first-child{{color:#888;white-space:nowrap;width:200px}}
-</style>
-</head>
-<body>
-<h1>{network}</h1>
-<p class="subtitle">Post-Quantum Blockchain Explorer</p>
-<div class="grid">
-  <div class="card"><h3>Latest Block</h3><div class="value">#{height}</div></div>
-  <div class="card"><h3>Chain ID</h3><div class="value">{chain_id}</div></div>
-  <div class="card"><h3>Connected Peers</h3><div class="value">{peers}</div></div>
-  <div class="card"><h3>Ticker</h3><div class="value">{ticker}</div></div>
-</div>
-<div class="card">
-  <h3>Latest Block Hash</h3>
-  <div class="mono">{hash}</div>
-</div>
-<div class="metamask">
-  <h2>Add to MetaMask</h2>
-  <table>
-    <tr><td>Network Name</td><td>{network}</td></tr>
-    <tr><td>RPC URL</td><td>{rpc}</td></tr>
-    <tr><td>Chain ID</td><td>{chain_id}</td></tr>
-    <tr><td>Currency Symbol</td><td>{ticker}</td></tr>
-    <tr><td>Block Explorer URL</td><td>{explorer}</td></tr>
-  </table>
-</div>
-</body>
-</html>"#,
-                network = status.metadata.network_name,
-                chain_id = chain_id,
-                height = height,
-                hash = hash,
-                peers = peers,
-                ticker = status.metadata.ticker,
-                rpc = status.metadata.rpc_urls.first().cloned().unwrap_or_default(),
-                explorer = status.metadata.block_explorer_url,
+    let status = state.provider.get_chain_status().await.ok();
+    let peers = status.as_ref().map(|s| s.peers.len()).unwrap_or(0);
+    let ticker = status.as_ref().map(|s| s.metadata.ticker.clone()).unwrap_or_else(|| "ZPQ".to_string());
+    let blocks = state.provider.get_recent_blocks(20).await.unwrap_or_default();
+    let height = blocks.first().map(|b| b.block.header.height).unwrap_or(0);
+    let block_data: Vec<(u64, String, u64, usize, String)> = blocks
+        .iter()
+        .map(|b| {
+            let h = &b.block.header;
+            (h.height, b.block.hash().to_string(), h.timestamp_ms, b.block.transactions.len(), h.proposer.to_string())
+        })
+        .collect();
+    Html(pages::explorer_page(height, chain_id, peers, &ticker, &block_data))
+}
+
+async fn handle_block_page(
+    State(state): State<RpcState>,
+    axum::extract::Path(height): axum::extract::Path<u64>,
+) -> impl IntoResponse {
+    match state.provider.get_block_by_height(height).await {
+        Ok(Some(block)) => {
+            let h = &block.block.header;
+            let txs: Vec<(String, String, String, u128, u128)> = block.block.transactions.iter().map(|tx| {
+                (tx.id().to_string(), tx.body.sender.to_string(), tx.body.recipient.to_string(), tx.body.amount, tx.body.fee)
+            }).collect();
+            Html(pages::block_page(
+                h.height, &block.block.hash().to_string(), &h.parent_hash.to_string(),
+                &h.state_root.to_string(), &h.tx_root.to_string(), &h.receipt_root.to_string(),
+                &h.proposer.to_string(), h.timestamp_ms, block.block.transactions.len(), &txs,
             ))
         }
-        (Err(err), _) | (_, Err(err)) => Html(format!(
-            "<html><body><h1>Explorer Unavailable</h1><p>{}</p></body></html>",
-            err
-        )),
+        _ => Html(pages::page("Not Found", "explorer", "<div class=\"hero\"><h1>Block Not Found</h1></div>")),
     }
+}
+
+async fn handle_tx_page(
+    State(state): State<RpcState>,
+    axum::extract::Path(hash): axum::extract::Path<String>,
+) -> impl IntoResponse {
+    let hash_str = hash.strip_prefix("0x").unwrap_or(&hash);
+    let parsed = hex::decode(hash_str).ok().and_then(|b| {
+        if b.len() == 32 { let mut h = [0u8;32]; h.copy_from_slice(&b); Some(zeno_hash::Hash32(h)) } else { None }
+    });
+    let Some(parsed) = parsed else {
+        return Html(pages::page("Not Found", "explorer", "<div class=\"hero\"><h1>Invalid Hash</h1></div>"));
+    };
+    match state.provider.get_tx_status(parsed).await {
+        Ok(TransactionStatus::Finalized(receipt)) => {
+            let (from, to, amount, fee, nonce) = state.provider.get_block_by_height(receipt.height).await.ok().flatten()
+                .and_then(|b| b.block.transactions.iter().find(|tx| tx.id() == parsed).map(|tx| {
+                    (tx.body.sender.to_string(), tx.body.recipient.to_string(), tx.body.amount, tx.body.fee, tx.body.nonce)
+                }))
+                .unwrap_or_else(|| ("unknown".to_string(), "unknown".to_string(), 0, 0, 0));
+            let status = match receipt.outcome { zeno_types::ExecutionOutcome::Success => "Success", _ => "Failed" };
+            Html(pages::tx_page(&hash, receipt.height, &from, &to, amount, fee, nonce, status))
+        }
+        _ => Html(pages::page("Not Found", "explorer", "<div class=\"hero\"><h1>Transaction Not Found</h1></div>")),
+    }
+}
+
+async fn handle_address_page(
+    State(state): State<RpcState>,
+    axum::extract::Path(address): axum::extract::Path<String>,
+) -> impl IntoResponse {
+    let addr_str = address.strip_prefix("0x").unwrap_or(&address);
+    // Try as 20-byte EVM address first, then 32-byte native.
+    let (balance, nonce) = if addr_str.len() == 40 {
+        if let Ok(addr) = parse_hex_address(&json!(format!("0x{addr_str}"))) {
+            let b = state.provider.eth_get_balance(addr).await.unwrap_or(0);
+            let n = state.provider.eth_get_transaction_count(addr).await.unwrap_or(0);
+            (b, n)
+        } else { (0, 0) }
+    } else if addr_str.len() == 64 {
+        if let Ok(bytes) = hex::decode(addr_str) {
+            let mut a = [0u8;32]; a.copy_from_slice(&bytes);
+            let b = state.provider.get_balance(Address(a)).await.unwrap_or(0);
+            let n = state.provider.get_nonce(Address(a)).await.unwrap_or(0);
+            (b, n)
+        } else { (0, 0) }
+    } else { (0, 0) };
+    Html(pages::address_page(&address, balance, nonce))
+}
+
+async fn handle_staking_page(State(state): State<RpcState>) -> impl IntoResponse {
+    let staking = state.provider.get_staking_state().await.unwrap_or_default();
+    let validators: Vec<(String, u128, u128, u16, String)> = staking.validators.values().map(|v| {
+        let status = match v.status {
+            zeno_types::ValidatorStatus::Active => "Active",
+            zeno_types::ValidatorStatus::Jailed => "Jailed",
+            zeno_types::ValidatorStatus::Inactive => "Inactive",
+        };
+        (v.validator_address.to_string(), v.self_bond, v.total_stake, v.commission_bps, status.to_string())
+    }).collect();
+    Html(pages::staking_page(staking.epoch, staking.treasury_balance, &validators))
+}
+
+async fn handle_governance_page(State(state): State<RpcState>) -> impl IntoResponse {
+    let gov = state.provider.get_governance_state().await;
+    match gov {
+        Ok(g) => {
+            let pending: Vec<(u64, u64, String)> = g.pending.iter().map(|p| (p.proposal_id, p.activation_epoch, p.description.clone())).collect();
+            Html(pages::governance_page(g.next_proposal_id, g.economics.treasury_bps, g.economics.epoch_length, g.economics.minimum_self_bond, &pending))
+        }
+        Err(_) => Html(pages::page("Governance", "governance", "<div class=\"hero\"><h1>Governance Unavailable</h1></div>")),
+    }
+}
+
+async fn handle_faucet_page(State(_state): State<RpcState>) -> impl IntoResponse {
+    Html(pages::faucet_page())
 }
 
 async fn handle_rpc(
@@ -731,6 +787,39 @@ async fn dispatch(provider: Arc<dyn RpcProvider>, request: JsonRpcRequest) -> Re
                 .to_string();
             let hash = provider.eth_send_raw_transaction(raw).await?;
             Ok(json!(format!("0x{hash}")))
+        }
+
+        "get_recent_blocks" => {
+            let count = param_at(params, 0).and_then(|v| v.as_u64()).unwrap_or(10);
+            let blocks = provider.get_recent_blocks(count).await?;
+            Ok(json!(blocks))
+        }
+        "get_staking_state" => {
+            Ok(json!(provider.get_staking_state().await?))
+        }
+        "get_governance_state" => {
+            Ok(json!(provider.get_governance_state().await?))
+        }
+        "faucet_send" => {
+            let addr_str = param_at(params, 0).and_then(|v| v.as_str()).ok_or_else(|| anyhow!("missing address"))?;
+            let addr_hex = addr_str.strip_prefix("0x").unwrap_or(addr_str);
+            // Support both 20-byte and 32-byte addresses.
+            let address = if addr_hex.len() == 40 {
+                let bytes = hex::decode(addr_hex)?;
+                let mut addr = [0u8; 32];
+                addr[12..32].copy_from_slice(&bytes);
+                Address(addr)
+            } else if addr_hex.len() == 64 {
+                let bytes = hex::decode(addr_hex)?;
+                let mut addr = [0u8; 32];
+                addr.copy_from_slice(&bytes);
+                Address(addr)
+            } else {
+                return Err(anyhow!("invalid address length"));
+            };
+            let amount = param_at(params, 1).and_then(|v| v.as_u64()).unwrap_or(1_000_000) as u128;
+            provider.faucet_send(address, amount).await?;
+            Ok(json!({"status": "ok", "amount": amount}))
         }
 
         other => Err(anyhow!("unknown method: {other}")),

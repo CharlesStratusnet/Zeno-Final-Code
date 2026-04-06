@@ -617,6 +617,45 @@ impl RpcProvider for Node {
         Ok(zeno_hash::Hash32(tx_hash))
     }
 
+    async fn get_recent_blocks(&self, count: u64) -> Result<Vec<FinalizedBlock>> {
+        let latest_height = self
+            .store
+            .latest_block()?
+            .map(|b| b.block.header.height)
+            .unwrap_or(0);
+        let mut blocks = Vec::new();
+        let start = latest_height.saturating_sub(count.saturating_sub(1));
+        for h in (start..=latest_height).rev() {
+            if let Some(block) = self.store.get_block_by_height(h)? {
+                blocks.push(block);
+            }
+        }
+        Ok(blocks)
+    }
+
+    async fn get_staking_state(&self) -> Result<zeno_types::StakingState> {
+        Ok(self
+            .store
+            .get_staking_state()?
+            .unwrap_or_default())
+    }
+
+    async fn get_governance_state(&self) -> Result<zeno_types::GovernanceState> {
+        self.store
+            .get_governance_state()?
+            .ok_or_else(|| anyhow!("governance state not initialized"))
+    }
+
+    async fn faucet_send(&self, recipient: Address, amount: u128) -> Result<()> {
+        let mut account = self
+            .store
+            .get_account(&recipient)?
+            .unwrap_or_default();
+        account.balance = account.balance.saturating_add(amount);
+        self.store.put_account(&recipient, &account)?;
+        Ok(())
+    }
+
     async fn metrics(&self) -> Result<String> {
         Ok(crate::operations_plane::encode_metrics())
     }

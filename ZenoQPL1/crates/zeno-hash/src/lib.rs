@@ -70,6 +70,10 @@ pub fn sha3_hash(bytes: impl AsRef<[u8]>) -> Hash32 {
 }
 
 /// Deterministic merkle root built from leaf hashes.
+///
+/// Uses canonical construction: when the leaf count is odd, the last leaf
+/// is duplicated as its own sibling (Bitcoin-style). This is the only valid
+/// construction — all implementations MUST use this exact algorithm.
 pub fn merkle_root(leaves: &[Hash32]) -> Hash32 {
     if leaves.is_empty() {
         return hash_bytes([]);

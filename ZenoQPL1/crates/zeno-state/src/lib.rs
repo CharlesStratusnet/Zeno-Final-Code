@@ -213,6 +213,21 @@ impl StakingSnapshot {
         validator.self_bond = validator.self_bond.min(validator.total_stake);
         if jail {
             validator.status = ValidatorStatus::Jailed;
+            // Freeze all delegations — they cannot earn rewards while jailed
+            // and won't count toward the active validator set.
+            for delegation in self.state.delegations.values_mut() {
+                if delegation.validator_address == validator_address {
+                    // Move delegated amount to unbonding with immediate release
+                    // so delegators can recover their funds.
+                    self.state.unbonding.push(UnbondingDelegation {
+                        delegator: delegation.delegator,
+                        validator_address,
+                        amount: delegation.amount,
+                        release_epoch: self.state.epoch.saturating_add(1),
+                    });
+                    delegation.amount = 0;
+                }
+            }
         }
         self.state.slashing_events.push(SlashingEvent {
             validator_address,
@@ -484,6 +499,9 @@ impl SparseMerkleState {
 impl AccountProof {
     /// Verifies this proof against a sparse Merkle root.
     pub fn verify(&self, expected_root: Hash32) -> bool {
+        if self.siblings.len() != SPARSE_DEPTH {
+            return false;
+        }
         let mut current = match &self.account {
             Some(account) => leaf_hash(self.address, account),
             None => empty_hashes()[SPARSE_DEPTH],

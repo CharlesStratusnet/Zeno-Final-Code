@@ -25,11 +25,15 @@ pub enum ExecutionError {
     State(String),
 }
 
-/// Result of executing a block.
+/// Result of executing a block — not yet finalized (no certificate).
 #[derive(Debug, Clone)]
 pub struct BlockExecutionResult {
-    /// Finalized block bundle.
-    pub finalized: FinalizedBlock,
+    /// The executed block.
+    pub block: Block,
+    /// Receipts from execution.
+    pub receipts: Vec<Receipt>,
+    /// Optional epoch transition.
+    pub epoch_transition: Option<EpochTransition>,
     /// Collected proposer fees.
     pub proposer_fees: u128,
     /// State snapshot after execution, used for atomic commit.
@@ -130,8 +134,12 @@ impl ExecutionEngine {
         self.validate_transaction(scheme, state, height, tx)
             .map_err(|err| ExecutionError::Transaction(err.to_string()))?;
         let mut sender = state.account(&tx.body.sender);
-        sender.balance -= tx.body.amount + tx.body.fee;
-        sender.nonce += 1;
+        let total_cost = tx.body.amount.checked_add(tx.body.fee)
+            .ok_or_else(|| ExecutionError::Transaction("amount + fee overflow".to_string()))?;
+        sender.balance = sender.balance.checked_sub(total_cost)
+            .ok_or_else(|| ExecutionError::Transaction("insufficient balance (checked)".to_string()))?;
+        sender.nonce = sender.nonce.checked_add(1)
+            .ok_or_else(|| ExecutionError::Transaction("nonce overflow".to_string()))?;
         state.put_account(tx.body.sender, sender);
         let mut evm_result = None;
         if let Some(evm_tx) = &tx.body.evm {
@@ -144,7 +152,7 @@ impl ExecutionEngine {
             evm_result = Some(result);
         } else {
             let mut recipient = state.account(&tx.body.recipient);
-            recipient.balance += tx.body.amount;
+            recipient.balance = recipient.balance.saturating_add(tx.body.amount);
             state.put_account(tx.body.recipient, recipient);
         }
         Ok(Receipt {
@@ -164,23 +172,14 @@ impl ExecutionEngine {
         block: Block,
     ) -> Result<BlockExecutionResult, ExecutionError> {
         let prepared = self.prepare_block(scheme, store, &block)?;
-        // Persist staking/governance side-effects (non-critical, can be replayed).
+        // Persist staking/governance side-effects.
         self.persist_accounting(store, &prepared)
             .map_err(|err| ExecutionError::State(err.to_string()))?;
-        let finalized = FinalizedBlock {
+        debug!(height = block.header.height, "executed block");
+        Ok(BlockExecutionResult {
             block,
-            certificate: zeno_types::CommitCertificate {
-                block_hash: Hash32::zero(),
-                height: 0,
-                round: 0,
-                votes: Vec::new(),
-            },
             receipts: prepared.receipts,
             epoch_transition: prepared.accounting.epoch_transition,
-        };
-        debug!(height = finalized.block.header.height, "executed block");
-        Ok(BlockExecutionResult {
-            finalized,
             proposer_fees: prepared.proposer_fees,
             state: prepared.state,
         })
@@ -201,9 +200,11 @@ impl ExecutionEngine {
             return Err(ExecutionError::Block("epoch transition mismatch".to_string()));
         }
         // Verify roots BEFORE any persistence (prepare_block already checked them).
-        self.persist_accounting(store, &prepared)
-            .map_err(|err| ExecutionError::State(err.to_string()))?;
+        // Commit block + accounts atomically first (critical path).
         self.commit_finalized_block(store, finalized, &prepared.state)
+            .map_err(|err| ExecutionError::State(err.to_string()))?;
+        // Then persist staking/governance (can be replayed from blocks if lost).
+        self.persist_accounting(store, &prepared)
             .map_err(|err| ExecutionError::State(err.to_string()))?;
         Ok(())
     }

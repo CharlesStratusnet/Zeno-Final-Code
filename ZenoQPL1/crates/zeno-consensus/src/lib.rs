@@ -63,6 +63,9 @@ struct RoundState {
     precommits: BTreeMap<zeno_hash::Hash32, BTreeSet<Address>>,
     votes: Vec<Vote>,
     evidence: Vec<Evidence>,
+    /// Tracks which (validator, height, round) combos have already been recorded
+    /// to prevent duplicate evidence slashing.
+    processed_evidence: BTreeSet<(Address, u64, u32)>,
     prevoted: bool,
     precommitted: bool,
     /// Round at which this node locked on a block (Tendermint locking).
@@ -85,6 +88,7 @@ impl Default for RoundState {
             precommits: BTreeMap::new(),
             votes: Vec::new(),
             evidence: Vec::new(),
+            processed_evidence: BTreeSet::new(),
             prevoted: false,
             precommitted: false,
             locked_round: None,
@@ -125,9 +129,9 @@ impl ConsensusEngine {
             height: recovered.snapshot.height,
             round: recovered.snapshot.round,
             locked_round: recovered.locked_round,
-            locked_block: recovered.locked_block.clone(),
-            valid_round: recovered.locked_round,
-            valid_block: recovered.locked_block,
+            locked_block: recovered.locked_block,
+            valid_round: recovered.valid_round,
+            valid_block: recovered.valid_block,
             ..RoundState::default()
         };
         Ok(Self {
@@ -275,19 +279,23 @@ impl ConsensusEngine {
             }
             if let Some(existing) = &guard.proposal {
                 if existing.hash() != proposal.block.hash() {
-                    let evidence = Evidence {
-                        validator_address: proposal.validator_address,
-                        height: proposal.height,
-                        round: proposal.round,
-                        reason: "conflicting proposal".to_string(),
-                    };
-                    self.append_wal(ConsensusWalEntry::EvidenceRecorded {
-                        height: evidence.height,
-                        round: evidence.round,
-                        validator_address: evidence.validator_address,
-                        reason: evidence.reason.clone(),
-                    })?;
-                    guard.evidence.push(evidence);
+                    let key = (proposal.validator_address, proposal.height, proposal.round);
+                    if !guard.processed_evidence.contains(&key) {
+                        let evidence = Evidence {
+                            validator_address: proposal.validator_address,
+                            height: proposal.height,
+                            round: proposal.round,
+                            reason: "conflicting proposal".to_string(),
+                        };
+                        self.append_wal(ConsensusWalEntry::EvidenceRecorded {
+                            height: evidence.height,
+                            round: evidence.round,
+                            validator_address: evidence.validator_address,
+                            reason: evidence.reason.clone(),
+                        })?;
+                        guard.processed_evidence.insert(key);
+                        guard.evidence.push(evidence);
+                    }
                 }
                 return Ok(());
             }
@@ -431,12 +439,16 @@ impl ConsensusEngine {
                         && existing.block_hash != vote.block_hash
                 })
             {
-                guard.evidence.push(Evidence {
-                    validator_address: vote.validator_address,
-                    height: vote.height,
-                    round: vote.round,
-                    reason: "duplicate vote".to_string(),
-                });
+                let key = (vote.validator_address, vote.height, vote.round);
+                if !guard.processed_evidence.contains(&key) {
+                    guard.processed_evidence.insert(key);
+                    guard.evidence.push(Evidence {
+                        validator_address: vote.validator_address,
+                        height: vote.height,
+                        round: vote.round,
+                        reason: "duplicate vote".to_string(),
+                    });
+                }
                 self.append_wal(ConsensusWalEntry::EvidenceRecorded {
                     height: vote.height,
                     round: vote.round,
@@ -469,16 +481,30 @@ impl ConsensusEngine {
                 should_precommit = Some(vote.block_hash);
                 // Polka detected — update locking state and persist to WAL.
                 if vote.block_hash != NIL_HASH {
-                    guard.valid_round = Some(vote.round);
-                    guard.valid_block = guard.proposal.clone();
-                    guard.locked_round = Some(vote.round);
-                    guard.locked_block = guard.proposal.clone();
-                    if let Some(ref locked_block) = guard.locked_block {
+                    // Verify the proposal matches the voted block before locking.
+                    let proposal_matches = guard
+                        .proposal
+                        .as_ref()
+                        .is_some_and(|p| p.hash() == vote.block_hash);
+                    if proposal_matches {
+                        let block = guard.proposal.clone().expect("proposal verified above");
+                        // Record polka (valid_round/valid_block) independently from lock.
+                        guard.valid_round = Some(vote.round);
+                        guard.valid_block = Some(block.clone());
+                        self.append_wal(ConsensusWalEntry::PolkaObserved {
+                            height: vote.height,
+                            valid_round: vote.round,
+                            block_hash: vote.block_hash,
+                            block: block.clone(),
+                        })?;
+                        // Lock on the block.
+                        guard.locked_round = Some(vote.round);
+                        guard.locked_block = Some(block.clone());
                         self.append_wal(ConsensusWalEntry::Locked {
                             height: vote.height,
                             locked_round: vote.round,
                             block_hash: vote.block_hash,
-                            block: locked_block.clone(),
+                            block,
                         })?;
                     }
                 }
@@ -536,20 +562,26 @@ impl ConsensusEngine {
         };
         self.validate_commit_certificate(&block, &certificate)?;
 
-        let mut executed = self.execution.execute_block(&*self.scheme, &self.store, block.clone())?;
-        executed.finalized.certificate = certificate;
+        let executed = self.execution.execute_block(&*self.scheme, &self.store, block.clone())?;
+        // Build FinalizedBlock only after we have both execution result AND certificate.
+        let finalized = FinalizedBlock {
+            block: executed.block,
+            certificate,
+            receipts: executed.receipts,
+            epoch_transition: executed.epoch_transition,
+        };
         self.append_wal(ConsensusWalEntry::CommitFinalized {
             height,
             round,
             block_hash,
         })?;
         self.execution
-            .commit_finalized_block(&self.store, &executed.finalized, &executed.state)
+            .commit_finalized_block(&self.store, &finalized, &executed.state)
             .context("commit finalized block")?;
         self.apply_pending_evidence()?;
-        self.mempool.remove_committed(&executed.finalized.block.transactions);
+        self.mempool.remove_committed(&finalized.block.transactions);
         self.network
-            .broadcast(NetworkMessage::Commit(executed.finalized.clone()))
+            .broadcast(NetworkMessage::Commit(finalized))
             .await?;
         info!(height, round, hash = %block_hash, "finalized block");
         self.advance_height(height + 1).await?;
@@ -781,12 +813,16 @@ struct RecoveredState {
     snapshot: ConsensusSnapshot,
     locked_round: Option<u32>,
     locked_block: Option<Block>,
+    valid_round: Option<u32>,
+    valid_block: Option<Block>,
 }
 
 fn recover_snapshot(snapshot: ConsensusSnapshot, wal: &[ConsensusWalEntry]) -> RecoveredState {
     let mut recovered = snapshot;
     let mut locked_round: Option<u32> = None;
     let mut locked_block: Option<Block> = None;
+    let mut valid_round: Option<u32> = None;
+    let mut valid_block: Option<Block> = None;
     for entry in wal {
         match entry {
             ConsensusWalEntry::SnapshotPersisted { height, round } => {
@@ -799,9 +835,10 @@ fn recover_snapshot(snapshot: ConsensusSnapshot, wal: &[ConsensusWalEntry]) -> R
                 if *next_height > recovered.height {
                     recovered.height = *next_height;
                     recovered.round = 0;
-                    // Clear locks on height advance.
                     locked_round = None;
                     locked_block = None;
+                    valid_round = None;
+                    valid_block = None;
                 }
             }
             ConsensusWalEntry::RoundAdvanced { height, next_round } => {
@@ -816,13 +853,20 @@ fn recover_snapshot(snapshot: ConsensusSnapshot, wal: &[ConsensusWalEntry]) -> R
                     recovered.round = 0;
                     locked_round = None;
                     locked_block = None;
+                    valid_round = None;
+                    valid_block = None;
                 }
             }
             ConsensusWalEntry::Locked { height, locked_round: lr, block, .. } => {
-                // Only restore locks for the current height.
                 if *height == recovered.height {
                     locked_round = Some(*lr);
                     locked_block = Some(block.clone());
+                }
+            }
+            ConsensusWalEntry::PolkaObserved { height, valid_round: vr, block, .. } => {
+                if *height == recovered.height {
+                    valid_round = Some(*vr);
+                    valid_block = Some(block.clone());
                 }
             }
             ConsensusWalEntry::ProposalAccepted { .. }
@@ -836,6 +880,8 @@ fn recover_snapshot(snapshot: ConsensusSnapshot, wal: &[ConsensusWalEntry]) -> R
         snapshot: recovered,
         locked_round,
         locked_block,
+        valid_round,
+        valid_block,
     }
 }
 

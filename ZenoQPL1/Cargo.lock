@@ -4435,6 +4435,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "zeno-codec",
  "zeno-config",
  "zeno-consensus",
  "zeno-crypto",

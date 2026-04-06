@@ -444,6 +444,7 @@ impl Node {
         let mut expected_height = pending.start_height.max(local_height.saturating_add(1));
         let mut heights = Vec::with_capacity(headers.len());
 
+        let mut prev_hash = latest_hash;
         for (index, header) in headers.iter().enumerate() {
             if header.chain_id != self.config.chain_id {
                 return Err(anyhow!("sync header chain id mismatch"));
@@ -454,6 +455,20 @@ impl Node {
             if index == 0 && header.parent_hash != latest_hash {
                 return Err(anyhow!("sync first header parent hash mismatch"));
             }
+            if index > 0 && header.parent_hash != prev_hash {
+                return Err(anyhow!("sync header parent hash chain broken at height {}", header.height));
+            }
+            // Verify timestamp is not in the far future (10 minute tolerance).
+            let now_ms = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis() as u64;
+            if header.timestamp_ms > now_ms.saturating_add(600_000) {
+                return Err(anyhow!("sync header timestamp too far in future"));
+            }
+            prev_hash = zeno_hash::hash_bytes(
+                zeno_codec::encode(header).map_err(|e| anyhow!("header encode: {e}"))?,
+            );
             heights.push(header.height);
             expected_height = expected_height.saturating_add(1);
         }
@@ -647,6 +662,31 @@ impl RpcProvider for Node {
     }
 
     async fn faucet_send(&self, recipient: Address, amount: u128) -> Result<()> {
+        // Rate limit: max 10,000,000 ZPQ per request.
+        const MAX_FAUCET_AMOUNT: u128 = 10_000_000;
+        if amount > MAX_FAUCET_AMOUNT {
+            return Err(anyhow!("faucet maximum is {MAX_FAUCET_AMOUNT} ZPQ per request"));
+        }
+        if amount == 0 {
+            return Err(anyhow!("amount must be greater than 0"));
+        }
+        // Check faucet balance.
+        let faucet_path = std::path::Path::new("./devnet/faucet.json");
+        if faucet_path.exists() {
+            let faucet_key = load_wallet_key(faucet_path)?;
+            let faucet_account = self
+                .store
+                .get_account(&faucet_key.address)?
+                .unwrap_or_default();
+            if faucet_account.balance < amount {
+                return Err(anyhow!("faucet is empty"));
+            }
+            // Deduct from faucet.
+            let mut updated_faucet = faucet_account;
+            updated_faucet.balance = updated_faucet.balance.saturating_sub(amount);
+            self.store.put_account(&faucet_key.address, &updated_faucet)?;
+        }
+        // Credit recipient.
         let mut account = self
             .store
             .get_account(&recipient)?
@@ -673,14 +713,25 @@ fn bootstrap_genesis(store: &SharedStore, genesis: &Genesis) -> Result<()> {
     let mut staking = StakingSnapshot::load(store)?;
     staking.ensure_validators(&genesis.validators);
     for validator in &genesis.validators {
-        let self_bond = genesis
+        let account = genesis
             .accounts
             .get(&validator.address)
-            .map(|account| account.balance.min(genesis.economics.minimum_self_bond))
-            .unwrap_or(0);
-        if self_bond > 0 {
-            let _ = staking.delegate(validator.address, validator.address, self_bond, true);
+            .ok_or_else(|| anyhow!(
+                "validator {} has no genesis account — cannot bootstrap",
+                validator.address
+            ))?;
+        if account.balance < genesis.economics.minimum_self_bond {
+            return Err(anyhow!(
+                "validator {} balance {} is below minimum self-bond {}",
+                validator.address,
+                account.balance,
+                genesis.economics.minimum_self_bond
+            ));
         }
+        let self_bond = genesis.economics.minimum_self_bond;
+        staking
+            .delegate(validator.address, validator.address, self_bond, true)
+            .map_err(|e| anyhow!("bootstrap delegation failed: {e}"))?;
     }
     staking.persist(store)?;
     Ok(())

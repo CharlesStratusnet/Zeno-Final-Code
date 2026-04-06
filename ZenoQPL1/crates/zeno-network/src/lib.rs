@@ -80,6 +80,8 @@ pub struct PeerState {
     pub is_outbound: bool,
     /// If banned, timestamp when ban expires.
     pub banned_until: Option<u64>,
+    /// Cryptographic node identity from handshake (prevents Sybil via IP rotation).
+    pub node_id: String,
 }
 
 /// Shared network handle.
@@ -329,6 +331,17 @@ async fn handle_connection(
     }
     match remote {
         NetworkMessage::Handshake(payload) if payload.chain_id == chain_id => {
+            // Check if this node_id is banned (prevents reconnect under new IP).
+            let is_node_banned = peers
+                .read()
+                .values()
+                .any(|state| {
+                    state.node_id == payload.node_id
+                        && state.banned_until.is_some_and(|until| now_ms() < until)
+                });
+            if is_node_banned {
+                return Err(anyhow!("node {} is banned", payload.node_id));
+            }
             peers.write().insert(
                 peer.clone(),
                 PeerState {
@@ -339,9 +352,10 @@ async fn handle_connection(
                     messages_received: 0,
                     is_outbound: !inbound_only,
                     banned_until: None,
+                    node_id: payload.node_id.clone(),
                 },
             );
-            info!(peer = %peer, inbound_only, "peer handshake accepted");
+            info!(peer = %peer, node_id = %payload.node_id, inbound_only, "peer handshake accepted");
         }
         NetworkMessage::Handshake(payload) => {
             return Err(anyhow!(

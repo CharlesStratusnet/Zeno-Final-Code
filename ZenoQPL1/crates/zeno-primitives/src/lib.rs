@@ -81,6 +81,12 @@ pub fn verify_transaction(
     if tx.body.amount == 0 && tx.body.evm.is_none() {
         return Err(TransactionError::ZeroAmount);
     }
+    // EVM transactions must pay a meaningful fee to prevent compute spam.
+    if let Some(ref evm) = tx.body.evm {
+        if tx.body.fee < 10 {
+            return Err(TransactionError::ZeroFee);
+        }
+    }
     if tx.body.fee == 0 {
         return Err(TransactionError::ZeroFee);
     }

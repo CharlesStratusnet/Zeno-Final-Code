@@ -791,6 +791,17 @@ pub enum ConsensusWalEntry {
         /// The locked block (serialized for recovery).
         block: Block,
     },
+    /// A polka (2/3+ prevotes) was observed for a block.
+    PolkaObserved {
+        /// Height.
+        height: u64,
+        /// Round at which the polka was observed.
+        valid_round: u32,
+        /// Hash of the block with the polka.
+        block_hash: Hash32,
+        /// The block that received the polka.
+        block: Block,
+    },
 }
 
 /// Stored block bundle.

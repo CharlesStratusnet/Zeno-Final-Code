@@ -27,6 +27,14 @@ pub enum MempoolError {
     /// Sender has too many pending transactions.
     #[error("sender limit exceeded")]
     SenderLimitExceeded,
+    /// Transaction nonce creates a gap.
+    #[error("nonce gap: expected <= {expected}, got {actual}")]
+    NonceGap {
+        /// Maximum expected nonce.
+        expected: u64,
+        /// Actual nonce received.
+        actual: u64,
+    },
 }
 
 #[derive(Default)]
@@ -35,6 +43,8 @@ struct Inner {
     by_sender_nonce: HashMap<(Address, u64), zeno_hash::Hash32>,
     order: BTreeSet<(u128, zeno_hash::Hash32)>,
     by_sender_count: HashMap<Address, usize>,
+    /// Tracks the highest nonce seen per sender to detect gaps.
+    highest_nonce: HashMap<Address, u64>,
 }
 
 /// Shared mempool.
@@ -80,6 +90,14 @@ impl Mempool {
             if sender_count >= MAX_PER_SENDER {
                 return Err(MempoolError::SenderLimitExceeded);
             }
+            // Nonce gap detection — reject nonces that skip too far ahead.
+            let highest = guard.highest_nonce.get(&tx.body.sender).copied().unwrap_or(0);
+            if tx.body.nonce > highest.saturating_add(MAX_PER_SENDER as u64) {
+                return Err(MempoolError::NonceGap {
+                    expected: highest.saturating_add(MAX_PER_SENDER as u64),
+                    actual: tx.body.nonce,
+                });
+            }
         }
 
         // Pool capacity check (only for non-replacements since replacements don't grow the pool).
@@ -110,6 +128,10 @@ impl Mempool {
         guard.by_sender_nonce.insert(key, hash);
         if !is_replacement {
             *guard.by_sender_count.entry(tx.body.sender).or_insert(0) += 1;
+        }
+        let highest = guard.highest_nonce.entry(tx.body.sender).or_insert(0);
+        if tx.body.nonce > *highest {
+            *highest = tx.body.nonce;
         }
         guard.by_hash.insert(hash, tx);
         Ok(())

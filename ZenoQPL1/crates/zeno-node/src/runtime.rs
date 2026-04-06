@@ -632,6 +632,38 @@ impl RpcProvider for Node {
         Ok(zeno_hash::Hash32(tx_hash))
     }
 
+    async fn register_validator(&self, request: zeno_types::ValidatorJoinRequest) -> Result<()> {
+        let scheme = &*self.scheme;
+        let address = Address(
+            scheme
+                .derive_address(&zeno_crypto::PublicKeyBytes(request.public_key.clone()))
+                .map_err(|e| anyhow!("invalid public key: {e}"))?,
+        );
+        if request.self_bond < self.genesis.economics.minimum_self_bond {
+            return Err(anyhow!(
+                "self-bond {} below minimum {}",
+                request.self_bond,
+                self.genesis.economics.minimum_self_bond
+            ));
+        }
+        let mut staking = zeno_state::StakingSnapshot::load(&self.store)?;
+        let validator = zeno_types::Validator {
+            validator_id: format!("validator-{}", hex::encode(&address.0[..8])),
+            voting_power: 1,
+            p2p_address: request.p2p_address,
+            rpc_address: request.rpc_address,
+            public_key: request.public_key,
+            address,
+        };
+        staking.ensure_validators(&[validator]);
+        staking
+            .delegate(address, address, request.self_bond, true)
+            .map_err(|e| anyhow!("delegation failed: {e}"))?;
+        staking.persist(&self.store)?;
+        info!(address = %address, "new validator registered");
+        Ok(())
+    }
+
     async fn get_recent_blocks(&self, count: u64) -> Result<Vec<FinalizedBlock>> {
         let latest_height = self
             .store
@@ -649,10 +681,14 @@ impl RpcProvider for Node {
     }
 
     async fn get_staking_state(&self) -> Result<zeno_types::StakingState> {
-        Ok(self
+        let mut state = self
             .store
             .get_staking_state()?
-            .unwrap_or_default())
+            .unwrap_or_default();
+        // Clear delegations map since tuple keys can't serialize to JSON.
+        // The validator table has total_stake which is the important info.
+        state.delegations.clear();
+        Ok(state)
     }
 
     async fn get_governance_state(&self) -> Result<zeno_types::GovernanceState> {

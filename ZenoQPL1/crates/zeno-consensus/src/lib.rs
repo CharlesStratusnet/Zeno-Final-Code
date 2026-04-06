@@ -208,9 +208,23 @@ impl ConsensusEngine {
             return Ok(());
         }
 
+        // Slashing protection: never sign a proposal at a height we've already signed.
+        let mut protection = self.store
+            .get_slashing_protection(&local.validator.address)?
+            .unwrap_or_default();
+        if snapshot.height <= protection.last_signed_proposal_height {
+            warn!(height = snapshot.height, "slashing protection: skipping proposal at already-signed height");
+            return Ok(());
+        }
+        protection.last_signed_proposal_height = snapshot.height;
+        self.store.put_slashing_protection(&local.validator.address, &protection)?;
+
+        // Evict expired transactions before selecting.
+        self.mempool.evict_expired(snapshot.height);
+
         let transactions = self
             .mempool
-            .select_for_block(self.params.max_transactions_per_block);
+            .select_for_block_prioritized(self.params.max_transactions_per_block, snapshot.height);
         let (state_after, receipts) = self.execution.dry_run_transactions(
             &*self.scheme,
             &self.store,
@@ -239,6 +253,16 @@ impl ConsensusEngine {
             PublicKeyBytes(local.validator.public_key.clone()),
             &local.secret_key,
         )?;
+        // Block size limit enforcement.
+        let block_bytes = zeno_codec::encode(&block).map_err(|e| anyhow!("encode block: {e}"))?;
+        if block_bytes.len() > self.params.max_block_bytes {
+            warn!(
+                size = block_bytes.len(),
+                max = self.params.max_block_bytes,
+                "proposed block exceeds size limit, dropping transactions"
+            );
+            return Ok(());
+        }
         self.note_validator_liveness(local.validator.address)?;
         self.append_wal(ConsensusWalEntry::ProposalAccepted {
             height: snapshot.height,
@@ -584,6 +608,20 @@ impl ConsensusEngine {
             .broadcast(NetworkMessage::Commit(finalized))
             .await?;
         info!(height, round, hash = %block_hash, "finalized block");
+        // WAL compaction — remove entries from more than 10 heights ago.
+        if height > 10 {
+            let compacted = self.store.compact_consensus_wal(height.saturating_sub(10))?;
+            if compacted > 0 {
+                info!(compacted, "compacted consensus WAL");
+            }
+        }
+        // State pruning — remove old blocks if pruning is configured.
+        if height > 1000 {
+            let pruned = self.store.prune_blocks_below(height.saturating_sub(1000))?;
+            if pruned > 0 {
+                info!(pruned, "pruned old blocks");
+            }
+        }
         self.advance_height(height + 1).await?;
         Ok(())
     }

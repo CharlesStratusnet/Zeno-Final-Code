@@ -52,6 +52,9 @@ impl NodeConfig {
             proposal_timeout_ms: self.consensus.proposal_timeout.as_millis() as u64,
             vote_timeout_ms: self.consensus.vote_timeout.as_millis() as u64,
             max_transactions_per_block: self.consensus.max_transactions_per_block,
+            max_block_bytes: 2_097_152,
+            target_gas_per_block: 15_000_000,
+            max_gas_per_block: 30_000_000,
         }
     }
 

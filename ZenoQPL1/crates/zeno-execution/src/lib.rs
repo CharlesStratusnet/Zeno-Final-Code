@@ -11,7 +11,7 @@ use zeno_state::{GovernanceSnapshot, StakingSnapshot, StateSnapshot};
 use zeno_storage::SharedStore;
 use zeno_types::{
     Address, Block, BlockHeader, ChainId, EconomicsParams, EpochTransition, ExecutionOutcome,
-    FinalizedBlock, Receipt, Transaction, TransactionError, Validator,
+    FinalizedBlock, GasPricingState, Receipt, Transaction, TransactionError, Validator,
 };
 
 /// Errors raised by the execution engine.
@@ -55,15 +55,51 @@ struct PreparedBlock {
     accounting: AccountingArtifacts,
 }
 
+/// Native transaction gas costs.
+pub const NATIVE_TRANSFER_GAS: u64 = 21_000;
+/// Gas per byte of transaction data.
+pub const GAS_PER_BYTE: u64 = 16;
+/// EIP-1559 base fee adjustment denominator.
+pub const BASE_FEE_CHANGE_DENOMINATOR: u128 = 8;
+/// Minimum base fee.
+pub const MIN_BASE_FEE: u128 = 1;
+
 /// Execution engine.
 pub struct ExecutionEngine {
     chain_id: ChainId,
     evm_chain_id: Option<u64>,
     economics: Option<EconomicsParams>,
     validators: Vec<Validator>,
+    target_gas_per_block: u64,
 }
 
 impl ExecutionEngine {
+    /// Computes gas cost for a native (non-EVM) transaction.
+    pub fn compute_native_gas(tx: &Transaction) -> u64 {
+        let base = NATIVE_TRANSFER_GAS;
+        let memo_gas = tx.body.memo.as_ref().map(|m| m.len() as u64 * GAS_PER_BYTE).unwrap_or(0);
+        let sig_gas = (tx.signature.len() as u64 / 32) * 10;
+        base + memo_gas + sig_gas
+    }
+
+    /// Updates EIP-1559 base fee based on gas usage.
+    pub fn update_base_fee(current: &GasPricingState, target_gas: u64) -> GasPricingState {
+        let base = if current.base_fee == 0 { MIN_BASE_FEE } else { current.base_fee };
+        let new_base = if current.last_block_gas_used > target_gas {
+            let excess = current.last_block_gas_used.saturating_sub(target_gas) as u128;
+            let delta = base.saturating_mul(excess) / (target_gas as u128) / BASE_FEE_CHANGE_DENOMINATOR;
+            base.saturating_add(delta.max(1))
+        } else {
+            let deficit = target_gas.saturating_sub(current.last_block_gas_used) as u128;
+            let delta = base.saturating_mul(deficit) / (target_gas as u128) / BASE_FEE_CHANGE_DENOMINATOR;
+            base.saturating_sub(delta).max(MIN_BASE_FEE)
+        };
+        GasPricingState {
+            base_fee: new_base,
+            last_block_gas_used: 0,
+        }
+    }
+
     /// Creates a new engine.
     pub fn new(chain_id: ChainId) -> Self {
         Self {
@@ -71,6 +107,7 @@ impl ExecutionEngine {
             evm_chain_id: None,
             economics: None,
             validators: Vec::new(),
+            target_gas_per_block: 15_000_000,
         }
     }
 
@@ -81,6 +118,7 @@ impl ExecutionEngine {
             evm_chain_id,
             economics: None,
             validators: Vec::new(),
+            target_gas_per_block: 15_000_000,
         }
     }
 
@@ -96,6 +134,7 @@ impl ExecutionEngine {
             evm_chain_id,
             economics: Some(economics),
             validators,
+            target_gas_per_block: 15_000_000,
         }
     }
 

@@ -183,6 +183,47 @@ impl Mempool {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
+
+    /// Evicts transactions that have expired (valid_until < current_height).
+    pub fn evict_expired(&self, current_height: u64) {
+        let mut guard = self.inner.write();
+        let expired: Vec<zeno_hash::Hash32> = guard
+            .by_hash
+            .iter()
+            .filter(|(_, tx)| tx.body.valid_until.is_some_and(|until| current_height > until))
+            .map(|(hash, _)| *hash)
+            .collect();
+        for hash in expired {
+            if let Some(tx) = guard.by_hash.remove(&hash) {
+                guard.by_sender_nonce.remove(&(tx.body.sender, tx.body.nonce));
+                guard.order.remove(&(tx.body.fee, hash));
+                if let Some(count) = guard.by_sender_count.get_mut(&tx.body.sender) {
+                    *count = count.saturating_sub(1);
+                    if *count == 0 {
+                        guard.by_sender_count.remove(&tx.body.sender);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Returns transactions sorted by priority lane then fee.
+    /// Priority: consensus system txs (fee >= 1000) > normal txs.
+    pub fn select_for_block_prioritized(&self, limit: usize, current_height: u64) -> Vec<Transaction> {
+        let guard = self.inner.read();
+        let mut selected: Vec<&Transaction> = guard
+            .by_hash
+            .values()
+            .filter(|tx| !tx.body.valid_until.is_some_and(|until| current_height > until))
+            .collect();
+        // Sort: high-priority (fee >= 1000) first, then by fee descending.
+        selected.sort_by(|a, b| {
+            let a_priority = a.body.fee >= 1000;
+            let b_priority = b.body.fee >= 1000;
+            b_priority.cmp(&a_priority).then_with(|| b.body.fee.cmp(&a.body.fee))
+        });
+        selected.into_iter().take(limit).cloned().collect()
+    }
 }
 
 #[cfg(test)]

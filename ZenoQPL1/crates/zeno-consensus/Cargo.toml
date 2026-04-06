@@ -10,6 +10,7 @@ rust-version.workspace = true
 [dependencies]
 anyhow.workspace = true
 parking_lot.workspace = true
+zeno-codec = { path = "../zeno-codec" }
 serde.workspace = true
 thiserror.workspace = true
 tokio.workspace = true

@@ -75,6 +75,9 @@ pub trait RpcProvider: Send + Sync + 'static {
     async fn eth_gas_price(&self) -> Result<u128>;
     /// Sends a raw ECDSA-signed Ethereum transaction.
     async fn eth_send_raw_transaction(&self, raw_hex: String) -> Result<zeno_hash::Hash32>;
+    // -- Dynamic validator set --
+    /// Registers a new validator.
+    async fn register_validator(&self, request: zeno_types::ValidatorJoinRequest) -> Result<()>;
     // -- Explorer, staking, faucet, governance methods --
     /// Returns recent blocks (up to `count` from the tip).
     async fn get_recent_blocks(&self, count: u64) -> Result<Vec<FinalizedBlock>>;
@@ -789,6 +792,11 @@ async fn dispatch(provider: Arc<dyn RpcProvider>, request: JsonRpcRequest) -> Re
             Ok(json!(format!("0x{hash}")))
         }
 
+        "register_validator" => {
+            let request: zeno_types::ValidatorJoinRequest = serde_json::from_value(params.clone())?;
+            provider.register_validator(request).await?;
+            Ok(json!({"status": "ok"}))
+        }
         "get_recent_blocks" => {
             let count = param_at(params, 0).and_then(|v| v.as_u64()).unwrap_or(10);
             let blocks = provider.get_recent_blocks(count).await?;

@@ -402,6 +402,83 @@ pub struct ConsensusParams {
     pub vote_timeout_ms: u64,
     /// Maximum transactions per block.
     pub max_transactions_per_block: usize,
+    /// Maximum block size in bytes (default 2MB).
+    #[serde(default = "default_max_block_bytes")]
+    pub max_block_bytes: usize,
+    /// Target gas per block for EIP-1559 pricing (default 15M).
+    #[serde(default = "default_target_gas")]
+    pub target_gas_per_block: u64,
+    /// Maximum gas per block (default 30M).
+    #[serde(default = "default_max_gas")]
+    pub max_gas_per_block: u64,
+}
+
+fn default_max_block_bytes() -> usize { 2_097_152 }
+fn default_target_gas() -> u64 { 15_000_000 }
+fn default_max_gas() -> u64 { 30_000_000 }
+
+/// EIP-1559 style dynamic gas pricing state.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct GasPricingState {
+    /// Current base fee per gas unit.
+    pub base_fee: u128,
+    /// Gas used in the last block.
+    pub last_block_gas_used: u64,
+}
+
+/// Slashing protection record — prevents validators from double-signing.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct SlashingProtection {
+    /// Highest block height this validator has signed a proposal for.
+    pub last_signed_proposal_height: u64,
+    /// Highest block height this validator has signed a prevote for.
+    pub last_signed_prevote_height: u64,
+    /// Highest block height this validator has signed a precommit for.
+    pub last_signed_precommit_height: u64,
+}
+
+/// Validator join request for dynamic validator set changes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ValidatorJoinRequest {
+    /// Validator public key.
+    pub public_key: Vec<u8>,
+    /// P2P address.
+    pub p2p_address: String,
+    /// RPC address.
+    pub rpc_address: String,
+    /// Self-bond amount.
+    pub self_bond: u128,
+}
+
+/// Key rotation request.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct KeyRotationRequest {
+    /// Validator address (current identity).
+    pub validator_address: Address,
+    /// New public key.
+    pub new_public_key: Vec<u8>,
+    /// Signature from old key proving authorization.
+    pub authorization_signature: Vec<u8>,
+    /// Effective at this height.
+    pub effective_height: u64,
+}
+
+/// State pruning configuration.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PruningConfig {
+    /// Keep full state for the last N blocks.
+    pub keep_recent: u64,
+    /// Whether pruning is enabled.
+    pub enabled: bool,
+}
+
+impl Default for PruningConfig {
+    fn default() -> Self {
+        Self {
+            keep_recent: 1000,
+            enabled: false,
+        }
+    }
 }
 
 /// Human-facing network metadata.

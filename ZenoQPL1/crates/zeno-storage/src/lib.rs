@@ -15,7 +15,8 @@ use tracing::info;
 use zeno_hash::Hash32;
 use zeno_types::{
     Account, ConsensusSnapshot, ConsensusWalEntry, EvmAccountState, EvmAddress, EvmLog,
-    FinalizedBlock, EpochTransition, Genesis, GovernanceState, Receipt, StakingState,
+    FinalizedBlock, EpochTransition, GasPricingState, Genesis, GovernanceState, Receipt,
+    SlashingProtection, StakingState,
 };
 
 /// Storage errors.
@@ -99,6 +100,18 @@ pub trait ChainStore: Send + Sync {
         block: &FinalizedBlock,
         accounts: &BTreeMap<zeno_types::Address, Account>,
     ) -> Result<(), StorageError>;
+    /// Compacts the consensus WAL by removing entries below the given height.
+    fn compact_consensus_wal(&self, below_height: u64) -> Result<usize, StorageError>;
+    /// Saves slashing protection state for a validator.
+    fn put_slashing_protection(&self, address: &zeno_types::Address, protection: &SlashingProtection) -> Result<(), StorageError>;
+    /// Loads slashing protection state for a validator.
+    fn get_slashing_protection(&self, address: &zeno_types::Address) -> Result<Option<SlashingProtection>, StorageError>;
+    /// Saves gas pricing state.
+    fn put_gas_pricing(&self, state: &GasPricingState) -> Result<(), StorageError>;
+    /// Loads gas pricing state.
+    fn get_gas_pricing(&self) -> Result<Option<GasPricingState>, StorageError>;
+    /// Prunes old block data below the given height.
+    fn prune_blocks_below(&self, height: u64) -> Result<usize, StorageError>;
     /// Stores EVM logs for a block height.
     fn put_evm_logs(&self, height: u64, logs: &[EvmLog]) -> Result<(), StorageError>;
     /// Loads EVM logs for a single block height.
@@ -124,6 +137,8 @@ struct MemoryInner {
     governance_state: Option<GovernanceState>,
     epoch_transitions: BTreeMap<u64, EpochTransition>,
     evm_logs: BTreeMap<u64, Vec<EvmLog>>,
+    slashing_protection: BTreeMap<zeno_types::Address, SlashingProtection>,
+    gas_pricing: Option<GasPricingState>,
 }
 
 /// In-memory store for testing.
@@ -274,6 +289,58 @@ impl ChainStore for MemoryStore {
         guard.blocks_by_hash.insert(block.block.hash(), block.clone());
         guard.blocks_by_height.insert(block.block.header.height, block.clone());
         Ok(())
+    }
+
+    fn compact_consensus_wal(&self, below_height: u64) -> Result<usize, StorageError> {
+        let mut guard = self.inner.write();
+        let before = guard.consensus_wal.len();
+        guard.consensus_wal.retain(|entry| {
+            let height = match entry {
+                ConsensusWalEntry::SnapshotPersisted { height, .. }
+                | ConsensusWalEntry::ProposalAccepted { height, .. }
+                | ConsensusWalEntry::ProposalBroadcast { height, .. }
+                | ConsensusWalEntry::VoteRecorded { height, .. }
+                | ConsensusWalEntry::VoteBroadcast { height, .. }
+                | ConsensusWalEntry::CommitFinalized { height, .. }
+                | ConsensusWalEntry::EvidenceRecorded { height, .. }
+                | ConsensusWalEntry::Locked { height, .. }
+                | ConsensusWalEntry::PolkaObserved { height, .. } => *height,
+                ConsensusWalEntry::HeightAdvanced { next_height } => *next_height,
+                ConsensusWalEntry::RoundAdvanced { height, .. } => *height,
+            };
+            height >= below_height
+        });
+        Ok(before - guard.consensus_wal.len())
+    }
+
+    fn put_slashing_protection(&self, address: &zeno_types::Address, protection: &SlashingProtection) -> Result<(), StorageError> {
+        self.inner.write().slashing_protection.insert(*address, protection.clone());
+        Ok(())
+    }
+
+    fn get_slashing_protection(&self, address: &zeno_types::Address) -> Result<Option<SlashingProtection>, StorageError> {
+        Ok(self.inner.read().slashing_protection.get(address).cloned())
+    }
+
+    fn put_gas_pricing(&self, state: &GasPricingState) -> Result<(), StorageError> {
+        self.inner.write().gas_pricing = Some(state.clone());
+        Ok(())
+    }
+
+    fn get_gas_pricing(&self) -> Result<Option<GasPricingState>, StorageError> {
+        Ok(self.inner.read().gas_pricing.clone())
+    }
+
+    fn prune_blocks_below(&self, height: u64) -> Result<usize, StorageError> {
+        let mut guard = self.inner.write();
+        let keys: Vec<u64> = guard.blocks_by_height.range(..height).map(|(k, _)| *k).collect();
+        let count = keys.len();
+        for key in keys {
+            if let Some(block) = guard.blocks_by_height.remove(&key) {
+                guard.blocks_by_hash.remove(&block.block.hash());
+            }
+        }
+        Ok(count)
     }
 
     fn put_evm_logs(&self, height: u64, logs: &[EvmLog]) -> Result<(), StorageError> {
@@ -490,6 +557,70 @@ impl ChainStore for RocksStore {
         self.db
             .write(batch)
             .map_err(|err| StorageError::Backend(err.to_string()))
+    }
+
+    fn compact_consensus_wal(&self, below_height: u64) -> Result<usize, StorageError> {
+        let entries = self.load_consensus_wal()?;
+        let mut batch = WriteBatch::default();
+        let mut removed = 0usize;
+        for (index, entry) in entries.iter().enumerate() {
+            let height = match entry {
+                ConsensusWalEntry::SnapshotPersisted { height, .. }
+                | ConsensusWalEntry::ProposalAccepted { height, .. }
+                | ConsensusWalEntry::ProposalBroadcast { height, .. }
+                | ConsensusWalEntry::VoteRecorded { height, .. }
+                | ConsensusWalEntry::VoteBroadcast { height, .. }
+                | ConsensusWalEntry::CommitFinalized { height, .. }
+                | ConsensusWalEntry::EvidenceRecorded { height, .. }
+                | ConsensusWalEntry::Locked { height, .. }
+                | ConsensusWalEntry::PolkaObserved { height, .. } => *height,
+                ConsensusWalEntry::HeightAdvanced { next_height } => *next_height,
+                ConsensusWalEntry::RoundAdvanced { height, .. } => *height,
+            };
+            if height < below_height {
+                batch.delete(key("consensus-wal", (index as u64).to_le_bytes()));
+                removed += 1;
+            }
+        }
+        if removed > 0 {
+            self.db.write(batch).map_err(|err| StorageError::Backend(err.to_string()))?;
+        }
+        Ok(removed)
+    }
+
+    fn put_slashing_protection(&self, address: &zeno_types::Address, protection: &SlashingProtection) -> Result<(), StorageError> {
+        self.put_value(&key("slash-prot", address.0), protection)
+    }
+
+    fn get_slashing_protection(&self, address: &zeno_types::Address) -> Result<Option<SlashingProtection>, StorageError> {
+        self.get_value(&key("slash-prot", address.0))
+    }
+
+    fn put_gas_pricing(&self, state: &GasPricingState) -> Result<(), StorageError> {
+        self.put_value(b"meta:gas-pricing", state)
+    }
+
+    fn get_gas_pricing(&self) -> Result<Option<GasPricingState>, StorageError> {
+        self.get_value(b"meta:gas-pricing")
+    }
+
+    fn prune_blocks_below(&self, height: u64) -> Result<usize, StorageError> {
+        let mut batch = WriteBatch::default();
+        let mut removed = 0usize;
+        for h in 0..height {
+            let k = key("block-h", h.to_le_bytes());
+            if let Some(block_bytes) = self.db.get(&k).map_err(|e| StorageError::Backend(e.to_string()))? {
+                if let Ok(block) = decode::<FinalizedBlock>(&block_bytes) {
+                    batch.delete(key("block-b", block.block.hash().0));
+                }
+                batch.delete(k);
+                removed += 1;
+            }
+        }
+        if removed > 0 {
+            self.db.write(batch).map_err(|err| StorageError::Backend(err.to_string()))?;
+        }
+        Ok(removed)
     }
 
     fn put_evm_logs(&self, height: u64, logs: &[EvmLog]) -> Result<(), StorageError> {

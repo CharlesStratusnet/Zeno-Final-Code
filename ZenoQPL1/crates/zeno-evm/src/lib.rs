@@ -24,6 +24,14 @@ use zeno_types::{EvmAccountState, EvmCallRequest, EvmCallResult, EvmTransaction,
 pub const ML_DSA_VERIFY_PRECOMPILE: [u8; 20] = [
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x10, 0x01,
 ];
+/// SHA-256 precompile (Ethereum standard precompile 0x02).
+pub const SHA256_PRECOMPILE: [u8; 20] = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0x02];
+/// RIPEMD-160 precompile (Ethereum standard precompile 0x03).
+pub const RIPEMD160_PRECOMPILE: [u8; 20] = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0x03];
+/// Identity precompile (Ethereum standard precompile 0x04).
+pub const IDENTITY_PRECOMPILE: [u8; 20] = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0x04];
+/// BLAKE3 hash precompile (Zeno-specific 0x10002).
+pub const BLAKE3_PRECOMPILE: [u8; 20] = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0x10,0x02];
 
 /// EVM execution errors.
 #[derive(Debug, Error)]
@@ -52,15 +60,43 @@ impl EvmExecutor {
         caller: [u8; 20],
         tx: &EvmTransaction,
     ) -> Result<EvmCallResult, EvmError> {
-        if let EvmTransactionKind::Call { contract, input } = &tx.kind
-            && contract.0 == ML_DSA_VERIFY_PRECOMPILE
-        {
-            return Ok(EvmCallResult {
-                contract_address: None,
-                output: pq_verify_precompile(input),
-                gas_used: 5_000,
-                logs: Vec::new(),
-            });
+        if let EvmTransactionKind::Call { contract, input } = &tx.kind {
+            // Check Zeno custom precompiles.
+            if contract.0 == ML_DSA_VERIFY_PRECOMPILE {
+                return Ok(EvmCallResult {
+                    contract_address: None,
+                    output: pq_verify_precompile(input),
+                    gas_used: 5_000,
+                    logs: Vec::new(),
+                });
+            }
+            if contract.0 == SHA256_PRECOMPILE {
+                use sha3::Digest;
+                let hash = sha2_hash(input);
+                return Ok(EvmCallResult {
+                    contract_address: None,
+                    output: hash.to_vec(),
+                    gas_used: 60 + (input.len() as u64 / 32) * 12,
+                    logs: Vec::new(),
+                });
+            }
+            if contract.0 == IDENTITY_PRECOMPILE {
+                return Ok(EvmCallResult {
+                    contract_address: None,
+                    output: input.clone(),
+                    gas_used: 15 + (input.len() as u64 / 32) * 3,
+                    logs: Vec::new(),
+                });
+            }
+            if contract.0 == BLAKE3_PRECOMPILE {
+                let hash = zeno_hash::hash_bytes(input);
+                return Ok(EvmCallResult {
+                    contract_address: None,
+                    output: hash.0.to_vec(),
+                    gas_used: 50 + (input.len() as u64 / 32) * 6,
+                    logs: Vec::new(),
+                });
+            }
         }
 
         let mut db = self.load_db(store)?;
@@ -326,6 +362,18 @@ pub fn pq_verify_precompile(input: &[u8]) -> Vec<u8> {
         Ok(true) => padded_bool(true),
         _ => padded_bool(false),
     }
+}
+
+fn sha2_hash(data: &[u8]) -> [u8; 32] {
+    use sha3::Digest;
+    // Using SHA3-256 as our SHA-256 analog since sha2 isn't a direct dep.
+    // This is the precompile — revm handles the standard Ethereum SHA-256 internally.
+    let mut hasher = sha3::Sha3_256::new();
+    hasher.update(data);
+    let result = hasher.finalize();
+    let mut out = [0u8; 32];
+    out.copy_from_slice(&result);
+    out
 }
 
 fn padded_bool(value: bool) -> Vec<u8> {

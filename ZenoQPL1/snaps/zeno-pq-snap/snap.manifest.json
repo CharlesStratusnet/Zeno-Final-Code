@@ -1,0 +1,20 @@
+{
+  "version": "0.1.0",
+  "proposedName": "Zeno PQ Wallet Snap",
+  "description": "ML-DSA signing and relayer integration for Zeno PQ Chain",
+  "source": {
+    "shasum": "",
+    "location": {
+      "local": {
+        "filePath": "dist/bundle.js"
+      }
+    }
+  },
+  "initialPermissions": {
+    "snap_dialog": {},
+    "snap_manageState": {},
+    "endowment:rpc": {
+      "dapps": true
+    }
+  }
+}

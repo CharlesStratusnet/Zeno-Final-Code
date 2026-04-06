@@ -1,0 +1,22 @@
+[package]
+name = "zeno-mempool"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+parking_lot.workspace = true
+thiserror.workspace = true
+zeno-hash = { path = "../zeno-hash" }
+zeno-primitives = { path = "../zeno-primitives" }
+zeno-types = { path = "../zeno-types" }
+
+[dev-dependencies]
+zeno-crypto = { path = "../zeno-crypto" }
+
+[lints]
+workspace = true

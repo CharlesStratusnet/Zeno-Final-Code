@@ -1,0 +1,27 @@
+[package]
+name = "zeno-rpc"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+async-trait.workspace = true
+axum.workspace = true
+hex.workspace = true
+parking_lot.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tower-http.workspace = true
+tracing.workspace = true
+zeno-evm = { path = "../zeno-evm" }
+zeno-hash = { path = "../zeno-hash" }
+zeno-types = { path = "../zeno-types" }
+
+[lints]
+workspace = true

@@ -1,0 +1,27 @@
+[package]
+name = "zeno-network"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+bincode.workspace = true
+bytes.workspace = true
+futures.workspace = true
+parking_lot.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-stream.workspace = true
+tokio-util.workspace = true
+tracing.workspace = true
+zeno-codec = { path = "../zeno-codec" }
+zeno-hash = { path = "../zeno-hash" }
+zeno-types = { path = "../zeno-types" }
+
+[lints]
+workspace = true

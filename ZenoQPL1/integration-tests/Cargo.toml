@@ -1,0 +1,29 @@
+[package]
+name = "integration-tests"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+anyhow.workspace = true
+tempfile.workspace = true
+tokio.workspace = true
+zeno-codec = { path = "../crates/zeno-codec" }
+zeno-config = { path = "../crates/zeno-config" }
+zeno-crypto = { path = "../crates/zeno-crypto" }
+zeno-genesis = { path = "../crates/zeno-genesis" }
+zeno-node = { path = "../crates/zeno-node" }
+zeno-storage = { path = "../crates/zeno-storage" }
+zeno-test-utils = { path = "../crates/zeno-test-utils" }
+zeno-types = { path = "../crates/zeno-types" }
+zeno-wallet = { path = "../crates/zeno-wallet" }
+
+[dev-dependencies]
+proptest.workspace = true
+
+[lints]
+workspace = true

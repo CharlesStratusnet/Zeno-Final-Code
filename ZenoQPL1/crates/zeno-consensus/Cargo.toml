@@ -1,0 +1,28 @@
+[package]
+name = "zeno-consensus"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+parking_lot.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+zeno-crypto = { path = "../zeno-crypto" }
+zeno-execution = { path = "../zeno-execution" }
+zeno-hash = { path = "../zeno-hash" }
+zeno-mempool = { path = "../zeno-mempool" }
+zeno-network = { path = "../zeno-network" }
+zeno-primitives = { path = "../zeno-primitives" }
+zeno-state = { path = "../zeno-state" }
+zeno-storage = { path = "../zeno-storage" }
+zeno-types = { path = "../zeno-types" }
+
+[lints]
+workspace = true

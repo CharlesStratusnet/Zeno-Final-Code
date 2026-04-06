@@ -1,0 +1,54 @@
+services:
+  validator-0:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    command: ["node", "start", "--config", "/network/node-0/node.toml", "--genesis", "/network/genesis.json"]
+    volumes:
+      - ../devnet:/network
+      - validator0_data:/var/lib/zeno/node-0
+    ports:
+      - "8000:8000"
+      - "7000:7000"
+
+  validator-1:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    command: ["node", "start", "--config", "/network/node-1/node.toml", "--genesis", "/network/genesis.json"]
+    volumes:
+      - ../devnet:/network
+      - validator1_data:/var/lib/zeno/node-1
+    ports:
+      - "8001:8001"
+      - "7001:7001"
+
+  validator-2:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    command: ["node", "start", "--config", "/network/node-2/node.toml", "--genesis", "/network/genesis.json"]
+    volumes:
+      - ../devnet:/network
+      - validator2_data:/var/lib/zeno/node-2
+    ports:
+      - "8002:8002"
+      - "7002:7002"
+
+  validator-3:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    command: ["node", "start", "--config", "/network/node-3/node.toml", "--genesis", "/network/genesis.json"]
+    volumes:
+      - ../devnet:/network
+      - validator3_data:/var/lib/zeno/node-3
+    ports:
+      - "8003:8003"
+      - "7003:7003"
+
+volumes:
+  validator0_data:
+  validator1_data:
+  validator2_data:
+  validator3_data:

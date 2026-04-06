@@ -1,0 +1,25 @@
+[package]
+name = "zeno-crypto"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+hex.workspace = true
+oqs.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+zeroize.workspace = true
+zeno-codec = { path = "../zeno-codec" }
+zeno-hash = { path = "../zeno-hash" }
+
+[dev-dependencies]
+hex.workspace = true
+
+[lints]
+workspace = true

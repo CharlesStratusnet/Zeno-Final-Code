@@ -1,0 +1,6 @@
+/target
+/devnet
+/.cargo-home
+*.log
+*.db
+*.sqlite

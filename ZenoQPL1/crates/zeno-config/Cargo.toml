@@ -1,0 +1,22 @@
+[package]
+name = "zeno-config"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+humantime-serde.workspace = true
+serde.workspace = true
+toml.workspace = true
+zeno-crypto = { path = "../zeno-crypto" }
+zeno-types = { path = "../zeno-types" }
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

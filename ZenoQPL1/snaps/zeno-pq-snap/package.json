@@ -1,0 +1,9 @@
+{
+  "name": "zeno-pq-snap",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MetaMask Snap scaffold for ML-DSA signing on Zeno PQ Chain",
+  "scripts": {
+    "build": "echo 'Snap scaffold only: add your bundler here'"
+  }
+}

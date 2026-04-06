@@ -1,0 +1,36 @@
+[package]
+name = "zeno-node"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+async-trait.workspace = true
+parking_lot.workspace = true
+prometheus.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+zeno-config = { path = "../zeno-config" }
+zeno-consensus = { path = "../zeno-consensus" }
+zeno-crypto = { path = "../zeno-crypto" }
+zeno-evm = { path = "../zeno-evm" }
+zeno-execution = { path = "../zeno-execution" }
+zeno-genesis = { path = "../zeno-genesis" }
+zeno-hash = { path = "../zeno-hash" }
+zeno-mempool = { path = "../zeno-mempool" }
+zeno-network = { path = "../zeno-network" }
+zeno-primitives = { path = "../zeno-primitives" }
+zeno-rpc = { path = "../zeno-rpc" }
+zeno-state = { path = "../zeno-state" }
+zeno-storage = { path = "../zeno-storage" }
+zeno-types = { path = "../zeno-types" }
+zeno-wallet = { path = "../zeno-wallet" }
+
+[lints]
+workspace = true

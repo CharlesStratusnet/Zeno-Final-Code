@@ -1,0 +1,26 @@
+[package]
+name = "zeno-evm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+hex.workspace = true
+k256.workspace = true
+revm.workspace = true
+sha3.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+zeno-codec = { path = "../zeno-codec" }
+zeno-crypto = { path = "../zeno-crypto" }
+zeno-hash = { path = "../zeno-hash" }
+zeno-storage = { path = "../zeno-storage" }
+zeno-types = { path = "../zeno-types" }
+
+[lints]
+workspace = true

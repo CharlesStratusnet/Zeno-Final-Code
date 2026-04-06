@@ -1,0 +1,28 @@
+[package]
+name = "benchmarks"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+criterion.workspace = true
+tokio.workspace = true
+zeno-crypto = { path = "../crates/zeno-crypto" }
+zeno-evm = { path = "../crates/zeno-evm" }
+zeno-execution = { path = "../crates/zeno-execution" }
+zeno-mempool = { path = "../crates/zeno-mempool" }
+zeno-primitives = { path = "../crates/zeno-primitives" }
+zeno-state = { path = "../crates/zeno-state" }
+zeno-storage = { path = "../crates/zeno-storage" }
+zeno-types = { path = "../crates/zeno-types" }
+
+[[bench]]
+name = "core"
+harness = false
+
+[lints]
+workspace = true

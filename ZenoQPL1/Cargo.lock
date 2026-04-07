@@ -4348,6 +4348,7 @@ dependencies = [
  "zeno-hash",
  "zeno-storage",
  "zeno-types",
+ "zeno-zk",
 ]
 
 [[package]]
@@ -4453,6 +4454,7 @@ dependencies = [
  "zeno-storage",
  "zeno-types",
  "zeno-wallet",
+ "zeno-zk",
 ]
 
 [[package]]
@@ -4486,6 +4488,7 @@ dependencies = [
  "zeno-evm",
  "zeno-hash",
  "zeno-types",
+ "zeno-zk",
 ]
 
 [[package]]
@@ -4558,6 +4561,20 @@ dependencies = [
  "zeno-crypto",
  "zeno-evm",
  "zeno-primitives",
+ "zeno-types",
+]
+
+[[package]]
+name = "zeno-zk"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "hex",
+ "rand 0.9.2",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "zeno-hash",
  "zeno-types",
 ]
 

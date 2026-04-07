@@ -1,5 +1,5 @@
 [package]
-name = "zeno-evm"
+name = "zeno-zk"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -10,18 +10,12 @@ rust-version.workspace = true
 [dependencies]
 anyhow.workspace = true
 hex.workspace = true
-k256.workspace = true
-revm.workspace = true
-sha3.workspace = true
+rand.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 thiserror.workspace = true
-tracing.workspace = true
-zeno-codec = { path = "../zeno-codec" }
-zeno-crypto = { path = "../zeno-crypto" }
 zeno-hash = { path = "../zeno-hash" }
-zeno-storage = { path = "../zeno-storage" }
 zeno-types = { path = "../zeno-types" }
-zeno-zk = { path = "../zeno-zk" }
 
 [lints]
 workspace = true

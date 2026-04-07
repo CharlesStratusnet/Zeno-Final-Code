@@ -447,7 +447,8 @@ mod tests {
     use zeno_storage::MemoryStore;
     use zeno_types::{BlockHeader, ChainId, TransactionBody};
 
-    use super::ExecutionEngine;
+    use super::{ExecutionEngine, Hash32};
+    use zeno_types::FinalizedBlock;
 
     #[test]
     fn rejects_bad_nonce() {
@@ -532,9 +533,20 @@ mod tests {
         )
         .expect("sign block");
         let executed = engine.execute_block(&*scheme, &source_store, block).expect("execute");
+        let finalized = FinalizedBlock {
+            block: executed.block,
+            certificate: zeno_types::CommitCertificate {
+                block_hash: Hash32::zero(),
+                height: 1,
+                round: 0,
+                votes: Vec::new(),
+            },
+            receipts: executed.receipts,
+            epoch_transition: executed.epoch_transition,
+        };
 
         engine
-            .validate_and_commit_finalized_block(&*scheme, &target_store, &executed.finalized)
+            .validate_and_commit_finalized_block(&*scheme, &target_store, &finalized)
             .expect("replay commit");
 
         let latest = target_store.latest_block().expect("latest").expect("block");

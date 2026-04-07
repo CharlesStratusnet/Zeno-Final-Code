@@ -74,6 +74,8 @@ pub struct Node {
     pub operations_plane: OperationsPlane,
     /// Signature scheme.
     pub scheme: Arc<dyn zeno_crypto::SignatureScheme>,
+    /// Shielded (ZK) pool for private transactions.
+    pub zk_pool: Mutex<zeno_zk::ShieldedPool>,
     request_ids: AtomicU64,
     sync_state: Mutex<SyncState>,
 }
@@ -103,6 +105,7 @@ impl Node {
             operations_plane: OperationsPlane::new(),
             scheme: default_scheme(),
             request_ids: AtomicU64::new(1),
+            zk_pool: Mutex::new(zeno_zk::ShieldedPool::new()),
             sync_state: Mutex::new(SyncState::default()),
         })
     }
@@ -732,6 +735,36 @@ impl RpcProvider for Node {
         Ok(())
     }
 
+    async fn zk_shield(&self, request: zeno_zk::ShieldRequest) -> Result<u64> {
+        let mut pool = self.zk_pool.lock().expect("zk pool lock");
+        pool.shield(&request).map_err(|e| anyhow!("{e}"))
+    }
+
+    async fn zk_unshield(&self, request: zeno_zk::UnshieldRequest) -> Result<()> {
+        let recipient = request.recipient;
+        let value = request.value;
+        {
+            let mut pool = self.zk_pool.lock().expect("zk pool lock");
+            pool.unshield(&request).map_err(|e| anyhow!("{e}"))?;
+        }
+        // Credit recipient's public balance.
+        let mut account = self.store.get_account(&recipient)?.unwrap_or_default();
+        account.balance = account.balance.saturating_add(value);
+        self.store.put_account(&recipient, &account)?;
+        Ok(())
+    }
+
+    async fn zk_pool_info(&self) -> Result<serde_json::Value> {
+        let mut pool = self.zk_pool.lock().expect("zk pool lock");
+        let root = pool.root();
+        Ok(serde_json::json!({
+            "root": root.to_string(),
+            "commitment_count": pool.commitment_count(),
+            "nullifier_count": pool.nullifier_count(),
+            "total_shielded_value": pool.total_shielded_value,
+        }))
+    }
+
     async fn metrics(&self) -> Result<String> {
         Ok(crate::operations_plane::encode_metrics())
     }
@@ -797,6 +830,7 @@ pub async fn in_memory_node(config: NodeConfig, genesis: Genesis) -> Result<Node
         operations_plane: OperationsPlane::new(),
         scheme: default_scheme(),
         request_ids: AtomicU64::new(1),
+        zk_pool: Mutex::new(zeno_zk::ShieldedPool::new()),
         sync_state: Mutex::new(SyncState::default()),
     })
 }

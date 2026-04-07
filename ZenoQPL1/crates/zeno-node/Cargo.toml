@@ -33,6 +33,7 @@ zeno-state = { path = "../zeno-state" }
 zeno-storage = { path = "../zeno-storage" }
 zeno-types = { path = "../zeno-types" }
 zeno-wallet = { path = "../zeno-wallet" }
+zeno-zk = { path = "../zeno-zk" }
 
 [lints]
 workspace = true

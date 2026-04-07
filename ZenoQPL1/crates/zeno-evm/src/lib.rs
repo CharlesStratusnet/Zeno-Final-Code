@@ -32,6 +32,8 @@ pub const RIPEMD160_PRECOMPILE: [u8; 20] = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 pub const IDENTITY_PRECOMPILE: [u8; 20] = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0x04];
 /// BLAKE3 hash precompile (Zeno-specific 0x10002).
 pub const BLAKE3_PRECOMPILE: [u8; 20] = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0x10,0x02];
+/// ZK proof verification precompile (Zeno-specific 0x10003).
+pub const ZK_VERIFY_PRECOMPILE: [u8; 20] = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0x10,0x03];
 
 /// EVM execution errors.
 #[derive(Debug, Error)]
@@ -94,6 +96,14 @@ impl EvmExecutor {
                     contract_address: None,
                     output: hash.0.to_vec(),
                     gas_used: 50 + (input.len() as u64 / 32) * 6,
+                    logs: Vec::new(),
+                });
+            }
+            if contract.0 == ZK_VERIFY_PRECOMPILE {
+                return Ok(EvmCallResult {
+                    contract_address: None,
+                    output: zeno_zk::zk_verify_precompile(input),
+                    gas_used: 100_000, // ZK verification is expensive.
                     logs: Vec::new(),
                 });
             }

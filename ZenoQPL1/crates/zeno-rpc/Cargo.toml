@@ -22,6 +22,7 @@ tracing.workspace = true
 zeno-evm = { path = "../zeno-evm" }
 zeno-hash = { path = "../zeno-hash" }
 zeno-types = { path = "../zeno-types" }
+zeno-zk = { path = "../zeno-zk" }
 
 [lints]
 workspace = true

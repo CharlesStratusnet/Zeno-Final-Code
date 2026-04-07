@@ -20,6 +20,7 @@ members = [
     "crates/zeno-test-utils",
     "crates/zeno-types",
     "crates/zeno-wallet",
+    "crates/zeno-zk",
     "integration-tests",
 ]
 resolver = "2"

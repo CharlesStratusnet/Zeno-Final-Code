@@ -1052,6 +1052,9 @@ mod tests {
                 proposal_timeout_ms: 1000,
                 vote_timeout_ms: 1000,
                 max_transactions_per_block: 16,
+                max_block_bytes: 2_097_152,
+                target_gas_per_block: 15_000_000,
+                max_gas_per_block: 30_000_000,
             },
             crypto: CryptoParams {
                 ml_dsa_parameter: "ML-DSA-65 compatible (Dilithium3 family)".to_string(),

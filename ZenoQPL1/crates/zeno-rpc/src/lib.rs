@@ -87,6 +87,13 @@ pub trait RpcProvider: Send + Sync + 'static {
     async fn get_governance_state(&self) -> Result<zeno_types::GovernanceState>;
     /// Sends faucet tokens to an address.
     async fn faucet_send(&self, recipient: Address, amount: u128) -> Result<()>;
+    // -- Zero-knowledge proof methods --
+    /// Shields value into the private pool.
+    async fn zk_shield(&self, request: zeno_zk::ShieldRequest) -> Result<u64>;
+    /// Unshields value from the private pool.
+    async fn zk_unshield(&self, request: zeno_zk::UnshieldRequest) -> Result<()>;
+    /// Returns the shielded pool state (root, commitment count, nullifier count).
+    async fn zk_pool_info(&self) -> Result<serde_json::Value>;
     /// Returns Prometheus metrics text.
     async fn metrics(&self) -> Result<String>;
 }
@@ -828,6 +835,20 @@ async fn dispatch(provider: Arc<dyn RpcProvider>, request: JsonRpcRequest) -> Re
             let amount = param_at(params, 1).and_then(|v| v.as_u64()).unwrap_or(1_000_000) as u128;
             provider.faucet_send(address, amount).await?;
             Ok(json!({"status": "ok", "amount": amount}))
+        }
+
+        "zk_shield" => {
+            let request: zeno_zk::ShieldRequest = serde_json::from_value(params.clone())?;
+            let index = provider.zk_shield(request).await?;
+            Ok(json!({"index": index}))
+        }
+        "zk_unshield" => {
+            let request: zeno_zk::UnshieldRequest = serde_json::from_value(params.clone())?;
+            provider.zk_unshield(request).await?;
+            Ok(json!({"status": "ok"}))
+        }
+        "zk_pool_info" => {
+            Ok(provider.zk_pool_info().await?)
         }
 
         other => Err(anyhow!("unknown method: {other}")),

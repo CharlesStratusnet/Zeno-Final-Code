@@ -701,8 +701,8 @@ impl RpcProvider for Node {
     }
 
     async fn faucet_send(&self, recipient: Address, amount: u128) -> Result<()> {
-        // Rate limit: max 10,000,000 ZPQ per request.
-        const MAX_FAUCET_AMOUNT: u128 = 10_000_000;
+        // Rate limit: max 1000 ZPQ (in 18-decimal wei units) per request.
+        const MAX_FAUCET_AMOUNT: u128 = 1_000_000_000_000_000_000_000;
         if amount > MAX_FAUCET_AMOUNT {
             return Err(anyhow!("faucet maximum is {MAX_FAUCET_AMOUNT} ZPQ per request"));
         }

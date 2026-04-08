@@ -297,9 +297,9 @@ pub fn faucet_page() -> String {
 <div class="hero"><h1>Faucet</h1><p>Get free ZPQ testnet tokens</p></div>
 <div class="card" style="max-width:600px;margin:2rem auto">
 <h2>Request Tokens</h2>
-<p style="color:#666;margin-bottom:1.5rem;font-size:.85rem">Enter your wallet address to receive 1,000,000 ZPQ. Supports both MetaMask (0x...) and native Zeno addresses.</p>
+<p style="color:#666;margin-bottom:1.5rem;font-size:.85rem">Enter your wallet address to receive 1 ZPQ. Supports both MetaMask (0x...) and native Zeno addresses.</p>
 <div class="form-group"><label>Wallet Address</label><input type="text" id="faucetAddr" placeholder="0x... or native address"></div>
-<div class="form-group"><label>Amount</label><input type="number" id="faucetAmount" value="1000000" min="1" max="10000000"></div>
+<div class="form-group"><label>Amount</label><input type="text" id="faucetAmount" value="1000000000000000000" min="1"></div>
 <button class="btn" id="faucetBtn" onclick="requestFaucet()" style="width:100%;padding:.8rem">Request ZPQ</button>
 <div id="faucetResult" style="margin-top:1rem"></div>
 </div>
@@ -307,7 +307,7 @@ pub fn faucet_page() -> String {
 async function requestFaucet(){
   var btn=document.getElementById('faucetBtn');
   var addr=document.getElementById('faucetAddr').value.trim();
-  var amount=parseInt(document.getElementById('faucetAmount').value)||1000000;
+  var amount=document.getElementById('faucetAmount').value.trim()||"1000000000000000000";
   var result=document.getElementById('faucetResult');
   if(!addr){result.innerHTML='<div class="alert alert-error">Please enter an address</div>';return}
   btn.disabled=true;btn.textContent='Sending...';

@@ -832,7 +832,9 @@ async fn dispatch(provider: Arc<dyn RpcProvider>, request: JsonRpcRequest) -> Re
             } else {
                 return Err(anyhow!("invalid address length"));
             };
-            let amount = param_at(params, 1).and_then(|v| v.as_u64()).unwrap_or(1_000_000) as u128;
+            let amount: u128 = param_at(params, 1)
+                .and_then(|v| v.as_str().and_then(|s| s.parse().ok()).or_else(|| v.as_u64().map(|n| n as u128)))
+                .unwrap_or(1_000_000_000_000_000_000);
             provider.faucet_send(address, amount).await?;
             Ok(json!({"status": "ok", "amount": amount}))
         }

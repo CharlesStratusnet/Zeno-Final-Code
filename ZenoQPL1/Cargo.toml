@@ -28,9 +28,9 @@ resolver = "2"
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-license = "Apache-2.0"
-authors = ["OpenAI Codex"]
-repository = "https://example.invalid/zeno-pq-chain"
+license = "BSL-1.1"
+authors = ["Charles Cohen"]
+repository = "https://github.com/CharlesStratusnet/Zeno-Final-Code"
 rust-version = "1.92"
 
 [workspace.dependencies]

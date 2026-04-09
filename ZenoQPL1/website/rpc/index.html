@@ -1,0 +1,87 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RPC Endpoint — Zeno</title><link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Orbitron:wght@700;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--primary:#00FFFF;--secondary:#7B61FF;--bg:#030311;--fg:#E0E0FF;--muted:#12121f;--border:#222238;--font-display:'Orbitron',sans-serif;--font-heading:'Space Grotesk',sans-serif;--font-body:'Exo 2',sans-serif;--font-mono:'JetBrains Mono',monospace}
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:var(--font-body);background:var(--bg);color:var(--fg);-webkit-font-smoothing:antialiased}a{color:var(--primary);text-decoration:none}
+nav{position:sticky;top:0;z-index:100;padding:.8rem 2rem;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(16px);background:rgba(3,3,17,.8);border-bottom:1px solid var(--border)}
+nav .logo{font-family:var(--font-display);font-size:.9rem;font-weight:700;letter-spacing:.15em;color:#fff;display:flex;align-items:center;gap:.5rem}nav .logo img{height:24px;filter:invert(1)}
+nav .links{display:flex;gap:1.5rem;font-size:.8rem}nav .links a{color:#666;transition:color .2s}nav .links a:hover{color:#fff}
+.container{max-width:800px;margin:0 auto;padding:3rem 2rem}
+h1{font-family:var(--font-heading);font-size:1.8rem;font-weight:700;margin-bottom:.3rem}
+.sub{color:#666;font-size:.85rem;margin-bottom:2rem}
+.card{background:var(--muted);border:1px solid var(--border);border-radius:12px;padding:1.8rem;margin-bottom:1.2rem}
+.card h2{font-family:var(--font-heading);font-size:.9rem;font-weight:600;color:#888;margin-bottom:1rem;text-transform:uppercase;letter-spacing:.05em}
+pre{background:rgba(3,3,17,.6);border:1px solid var(--border);border-radius:8px;padding:1rem;font-family:var(--font-mono);font-size:.78rem;color:#999;line-height:1.7;overflow-x:auto;margin:.8rem 0}
+table{width:100%;border-collapse:collapse}
+td{padding:.5rem .8rem;border-bottom:1px solid var(--border);font-size:.85rem}
+td:first-child{color:#555;width:180px}
+code{font-family:var(--font-mono);background:rgba(0,255,255,.06);padding:.1rem .3rem;border-radius:3px;font-size:.78rem;color:var(--primary)}
+p{font-size:.88rem;color:#888;line-height:1.6;margin-bottom:.8rem}
+.status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:.4rem}
+.dot-ok{background:#34d399}
+.dot-err{background:#f87171}
+footer{border-top:1px solid var(--border);padding:2rem;text-align:center;color:#333;font-size:.7rem;letter-spacing:.08em}
+</style></head><body>
+<nav><a href="/" class="logo"><img src="/logo.png" alt="Zeno" width="24" height="24">ZENO</a><div class="links"><a href="/">Home</a><a href="/explorer/">Explorer</a><a href="/docs/">Docs</a><a href="/faucet/">Faucet</a><a href="/staking/">Staking</a><a href="/governance/">Governance</a><a href="/api/">API</a><a href="/status/">Status</a></div></nav>
+<div class="container">
+<h1>RPC Endpoint</h1>
+<p class="sub">Connect to Zeno PQ Chain</p>
+
+<div class="card">
+<h2>Connection Details</h2>
+<table>
+<tr><td>RPC URL</td><td><code id="rpc-url">http://localhost:8000</code></td></tr>
+<tr><td>Chain ID</td><td><code>424242</code> (0x67932)</td></tr>
+<tr><td>Currency</td><td>ZPQ</td></tr>
+<tr><td>Status</td><td><span class="status-dot" id="status-dot"></span><span id="status-text">Checking...</span></td></tr>
+<tr><td>Block Height</td><td id="rpc-height">—</td></tr>
+<tr><td>Latency</td><td id="rpc-latency">—</td></tr>
+</table>
+</div>
+
+<div class="card">
+<h2>Add to MetaMask</h2>
+<table>
+<tr><td>Network Name</td><td>Zeno PQ Chain</td></tr>
+<tr><td>New RPC URL</td><td id="mm-rpc">http://localhost:8000</td></tr>
+<tr><td>Chain ID</td><td>424242</td></tr>
+<tr><td>Symbol</td><td>ZPQ</td></tr>
+<tr><td>Explorer</td><td><a href="/explorer/">/explorer/</a></td></tr>
+</table>
+</div>
+
+<div class="card">
+<h2>Quick Test</h2>
+<p>Run this in your terminal to verify the RPC is working:</p>
+<pre>curl -s -X POST http://localhost:8000 \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}'</pre>
+<p>Expected response:</p>
+<pre>{"id":1,"jsonrpc":"2.0","result":"0x67932"}</pre>
+</div>
+
+<div class="card">
+<h2>Supported Methods</h2>
+<p>30+ JSON-RPC methods including full Ethereum compatibility. See the <a href="/api/">API Reference</a> for complete documentation.</p>
+<p><strong>Ethereum:</strong> eth_chainId, eth_blockNumber, eth_getBalance, eth_getTransactionCount, eth_getCode, eth_call, eth_estimateGas, eth_gasPrice, eth_getBlockByNumber, eth_getBlockByHash, eth_getTransactionByHash, eth_getTransactionReceipt, eth_getLogs, eth_sendRawTransaction, net_version, web3_clientVersion</p>
+<p><strong>Zeno:</strong> get_chain_status, get_staking_state, get_governance_state, faucet_send, register_validator, zk_shield, zk_unshield, zk_pool_info</p>
+</div>
+</div>
+<footer>ZENO PQ CHAIN &mdash; Chain ID 424242 &mdash; ML-DSA Secured</footer>
+<script src="/shared.js"></script>
+<script>
+async function check(){
+const start=Date.now();
+try{
+const height=hexToNum(await rpcCall('eth_blockNumber'));
+const latency=Date.now()-start;
+document.getElementById('status-dot').className='status-dot dot-ok';
+document.getElementById('status-text').textContent='Connected';
+document.getElementById('rpc-height').textContent=formatNum(height);
+document.getElementById('rpc-latency').textContent=latency+'ms';
+}catch(e){
+document.getElementById('status-dot').className='status-dot dot-err';
+document.getElementById('status-text').textContent='Unreachable';
+}
+}
+check();setInterval(check,5000);
+</script></body></html>

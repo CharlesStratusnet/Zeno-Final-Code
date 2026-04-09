@@ -1,0 +1,76 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>API Reference — Zeno</title><link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Orbitron:wght@700;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--primary:#00FFFF;--secondary:#7B61FF;--bg:#030311;--fg:#E0E0FF;--muted:#12121f;--border:#222238;--font-display:'Orbitron',sans-serif;--font-heading:'Space Grotesk',sans-serif;--font-body:'Exo 2',sans-serif;--font-mono:'JetBrains Mono',monospace}
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:var(--font-body);background:var(--bg);color:var(--fg);-webkit-font-smoothing:antialiased}a{color:var(--primary);text-decoration:none}
+nav{position:sticky;top:0;z-index:100;padding:.8rem 2rem;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(16px);background:rgba(3,3,17,.8);border-bottom:1px solid var(--border)}
+nav .logo{font-family:var(--font-display);font-size:.9rem;font-weight:700;letter-spacing:.15em;color:#fff;display:flex;align-items:center;gap:.5rem}nav .logo img{height:24px;filter:invert(1)}
+nav .links{display:flex;gap:1.5rem;font-size:.8rem}nav .links a{color:#666;transition:color .2s}nav .links a:hover{color:#fff}
+.container{max-width:1000px;margin:0 auto;padding:2rem}
+h1{font-family:var(--font-heading);font-size:1.8rem;font-weight:700;margin-bottom:.3rem}
+.sub{color:#666;font-size:.85rem;margin-bottom:2rem}
+h2{font-family:var(--font-heading);font-size:1.1rem;font-weight:600;margin:2.5rem 0 .8rem;padding-top:1.5rem;border-top:1px solid var(--border);color:var(--primary)}
+.method{background:var(--muted);border:1px solid var(--border);border-radius:10px;padding:1.2rem;margin-bottom:.8rem}
+.method-name{font-family:var(--font-mono);font-size:.85rem;font-weight:600;color:var(--primary);margin-bottom:.3rem}
+.method-desc{font-size:.8rem;color:#777;margin-bottom:.6rem}
+.method pre{background:rgba(3,3,17,.6);border:1px solid var(--border);border-radius:6px;padding:.8rem;font-family:var(--font-mono);font-size:.72rem;color:#999;line-height:1.6;overflow-x:auto;margin-top:.5rem}
+.try-btn{background:transparent;border:1px solid var(--border);border-radius:5px;padding:.3rem .8rem;color:#888;font-size:.72rem;cursor:pointer;margin-top:.5rem;transition:all .2s}
+.try-btn:hover{border-color:var(--primary);color:var(--primary)}
+.try-result{margin-top:.5rem;font-family:var(--font-mono);font-size:.72rem;color:#999;background:rgba(3,3,17,.6);border-radius:6px;padding:.6rem;display:none;white-space:pre-wrap;word-break:break-all;max-height:200px;overflow-y:auto}
+footer{border-top:1px solid var(--border);padding:2rem;text-align:center;color:#333;font-size:.7rem;letter-spacing:.08em}
+</style></head><body>
+<nav><a href="/" class="logo"><img src="/logo.png" alt="Zeno" width="24" height="24">ZENO</a><div class="links"><a href="/">Home</a><a href="/explorer/">Explorer</a><a href="/docs/">Docs</a><a href="/faucet/">Faucet</a><a href="/staking/">Staking</a><a href="/governance/">Governance</a><a href="/status/">Status</a></div></nav>
+<div class="container">
+<h1>API Reference</h1>
+<p class="sub">JSON-RPC endpoint with full Ethereum compatibility. All requests are POST to the RPC URL.</p>
+
+<h2>Ethereum Standard Methods</h2>
+
+<div class="method"><div class="method-name">eth_chainId</div><div class="method-desc">Returns the chain ID (424242 = 0x67932)</div><pre>{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}</pre><button class="try-btn" onclick="tryMethod(this,'eth_chainId',[])">Try it</button><div class="try-result"></div></div>
+
+<div class="method"><div class="method-name">eth_blockNumber</div><div class="method-desc">Returns the latest block height as hex</div><pre>{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}</pre><button class="try-btn" onclick="tryMethod(this,'eth_blockNumber',[])">Try it</button><div class="try-result"></div></div>
+
+<div class="method"><div class="method-name">eth_getBalance</div><div class="method-desc">Returns the balance of an address in wei</div><pre>{"jsonrpc":"2.0","id":1,"method":"eth_getBalance","params":["0xADDRESS","latest"]}</pre></div>
+
+<div class="method"><div class="method-name">eth_getTransactionCount</div><div class="method-desc">Returns the nonce (transaction count) for an address</div><pre>{"jsonrpc":"2.0","id":1,"method":"eth_getTransactionCount","params":["0xADDRESS","latest"]}</pre></div>
+
+<div class="method"><div class="method-name">eth_getBlockByNumber</div><div class="method-desc">Returns a block by height. Set second param to true for full tx objects.</div><pre>{"jsonrpc":"2.0","id":1,"method":"eth_getBlockByNumber","params":["latest",false]}</pre><button class="try-btn" onclick="tryMethod(this,'eth_getBlockByNumber',['latest',false])">Try it</button><div class="try-result"></div></div>
+
+<div class="method"><div class="method-name">eth_getTransactionReceipt</div><div class="method-desc">Returns a transaction receipt by hash</div><pre>{"jsonrpc":"2.0","id":1,"method":"eth_getTransactionReceipt","params":["0xHASH"]}</pre></div>
+
+<div class="method"><div class="method-name">eth_call</div><div class="method-desc">Executes a read-only EVM call</div><pre>{"jsonrpc":"2.0","id":1,"method":"eth_call","params":[{"to":"0xCONTRACT","data":"0xCALLDATA"},"latest"]}</pre></div>
+
+<div class="method"><div class="method-name">eth_sendRawTransaction</div><div class="method-desc">Submits an ECDSA-signed Ethereum transaction (from MetaMask)</div><pre>{"jsonrpc":"2.0","id":1,"method":"eth_sendRawTransaction","params":["0xSIGNED_TX_HEX"]}</pre></div>
+
+<div class="method"><div class="method-name">eth_gasPrice</div><div class="method-desc">Returns the current gas price</div><pre>{"jsonrpc":"2.0","id":1,"method":"eth_gasPrice","params":[]}</pre><button class="try-btn" onclick="tryMethod(this,'eth_gasPrice',[])">Try it</button><div class="try-result"></div></div>
+
+<div class="method"><div class="method-name">net_version</div><div class="method-desc">Returns the network version (chain ID as string)</div><pre>{"jsonrpc":"2.0","id":1,"method":"net_version","params":[]}</pre><button class="try-btn" onclick="tryMethod(this,'net_version',[])">Try it</button><div class="try-result"></div></div>
+
+<h2>Zeno Native Methods</h2>
+
+<div class="method"><div class="method-name">get_chain_status</div><div class="method-desc">Returns full chain status including metadata and peer info</div><pre>{"jsonrpc":"2.0","id":1,"method":"get_chain_status","params":[]}</pre><button class="try-btn" onclick="tryMethod(this,'get_chain_status',[])">Try it</button><div class="try-result"></div></div>
+
+<div class="method"><div class="method-name">get_staking_state</div><div class="method-desc">Returns current staking state with all validators</div><pre>{"jsonrpc":"2.0","id":1,"method":"get_staking_state","params":[]}</pre><button class="try-btn" onclick="tryMethod(this,'get_staking_state',[])">Try it</button><div class="try-result"></div></div>
+
+<div class="method"><div class="method-name">get_governance_state</div><div class="method-desc">Returns governance parameters and pending proposals</div><pre>{"jsonrpc":"2.0","id":1,"method":"get_governance_state","params":[]}</pre><button class="try-btn" onclick="tryMethod(this,'get_governance_state',[])">Try it</button><div class="try-result"></div></div>
+
+<div class="method"><div class="method-name">faucet_send</div><div class="method-desc">Sends testnet ZPQ to an address</div><pre>{"jsonrpc":"2.0","id":1,"method":"faucet_send","params":["0xADDRESS","1000000000000000000"]}</pre></div>
+
+<div class="method"><div class="method-name">register_validator</div><div class="method-desc">Registers a new validator with the network</div><pre>{"jsonrpc":"2.0","id":1,"method":"register_validator","params":[{"public_key":"HEX","p2p_address":"IP:PORT","rpc_address":"IP:PORT","self_bond":1000000}]}</pre></div>
+
+<h2>Zero-Knowledge Methods</h2>
+
+<div class="method"><div class="method-name">zk_shield</div><div class="method-desc">Deposits value into the shielded pool</div><pre>{"jsonrpc":"2.0","id":1,"method":"zk_shield","params":[{"value":1000,"commitment":"0xHASH"}]}</pre></div>
+
+<div class="method"><div class="method-name">zk_unshield</div><div class="method-desc">Withdraws value from the shielded pool</div><pre>{"jsonrpc":"2.0","id":1,"method":"zk_unshield","params":[{...}]}</pre></div>
+
+<div class="method"><div class="method-name">zk_pool_info</div><div class="method-desc">Returns shielded pool state</div><pre>{"jsonrpc":"2.0","id":1,"method":"zk_pool_info","params":[]}</pre><button class="try-btn" onclick="tryMethod(this,'zk_pool_info',[])">Try it</button><div class="try-result"></div></div>
+</div>
+<footer>ZENO PQ CHAIN &mdash; Chain ID 424242 &mdash; ML-DSA Secured</footer>
+<script src="/shared.js"></script>
+<script>
+async function tryMethod(btn,method,params){
+const resultEl=btn.nextElementSibling;resultEl.style.display='block';resultEl.textContent='Loading...';
+try{const result=await rpcCall(method,params);resultEl.textContent=JSON.stringify(result,null,2);}
+catch(e){resultEl.textContent='Error: '+e.message;}
+}
+</script></body></html>

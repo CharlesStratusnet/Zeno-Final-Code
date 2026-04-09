@@ -1,0 +1,66 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Governance — Zeno</title><link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Orbitron:wght@700;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--primary:#00FFFF;--secondary:#7B61FF;--bg:#030311;--fg:#E0E0FF;--muted:#12121f;--border:#222238;--font-display:'Orbitron',sans-serif;--font-heading:'Space Grotesk',sans-serif;--font-body:'Exo 2',sans-serif;--font-mono:'JetBrains Mono',monospace}
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:var(--font-body);background:var(--bg);color:var(--fg);-webkit-font-smoothing:antialiased}a{color:var(--primary);text-decoration:none}
+nav{position:sticky;top:0;z-index:100;padding:.8rem 2rem;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(16px);background:rgba(3,3,17,.8);border-bottom:1px solid var(--border)}
+nav .logo{font-family:var(--font-display);font-size:.9rem;font-weight:700;letter-spacing:.15em;color:#fff;display:flex;align-items:center;gap:.5rem}nav .logo img{height:24px;filter:invert(1)}
+nav .links{display:flex;gap:1.5rem;font-size:.8rem}nav .links a{color:#666;transition:color .2s}nav .links a:hover{color:#fff}
+.container{max-width:1000px;margin:0 auto;padding:2rem}
+h1{font-family:var(--font-heading);font-size:1.8rem;font-weight:700;margin-bottom:.3rem}
+.sub{color:#666;font-size:.85rem;margin-bottom:2rem}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.8rem;margin-bottom:2rem}
+.stat{background:var(--muted);border:1px solid var(--border);border-radius:10px;padding:1.2rem}
+.stat h3{color:#555;font-size:.65rem;letter-spacing:.12em;text-transform:uppercase;margin-bottom:.2rem}
+.stat .val{font-family:var(--font-display);font-size:1.1rem;font-weight:700;color:#fff}
+.card{background:var(--muted);border:1px solid var(--border);border-radius:12px;padding:1.5rem;margin-bottom:1.2rem}
+.card h2{font-family:var(--font-heading);font-size:.9rem;font-weight:600;color:#888;margin-bottom:1rem;text-transform:uppercase;letter-spacing:.05em}
+.detail-row{display:flex;border-bottom:1px solid var(--border);padding:.55rem 0}
+.detail-label{width:200px;color:#555;font-size:.82rem;flex-shrink:0}
+.detail-value{flex:1;font-size:.82rem}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;color:#555;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;padding:.5rem .6rem;border-bottom:1px solid var(--border)}
+td{padding:.55rem .6rem;border-bottom:1px solid rgba(34,34,56,.3);font-size:.8rem;color:#888}
+.badge{display:inline-block;padding:.1rem .4rem;border-radius:4px;font-size:.65rem;font-weight:600;background:#78350f;color:#fbbf24}
+footer{border-top:1px solid var(--border);padding:2rem;text-align:center;color:#333;font-size:.7rem;letter-spacing:.08em}
+</style></head><body>
+<nav><a href="/" class="logo"><img src="/logo.png" alt="Zeno" width="24" height="24">ZENO</a><div class="links"><a href="/">Home</a><a href="/explorer/">Explorer</a><a href="/docs/">Docs</a><a href="/faucet/">Faucet</a><a href="/staking/">Staking</a><a href="/api/">API</a><a href="/status/">Status</a></div></nav>
+<div class="container">
+<h1>Governance</h1>
+<p class="sub">Protocol parameter management for Zeno PQ Chain</p>
+<div class="stats">
+<div class="stat"><h3>Next Proposal ID</h3><div class="val" id="s-next">—</div></div>
+<div class="stat"><h3>Treasury Share</h3><div class="val" id="s-treasury">—</div></div>
+<div class="stat"><h3>Epoch Length</h3><div class="val" id="s-epoch">—</div></div>
+</div>
+<div class="card"><h2>Active Parameters</h2>
+<div id="params"></div>
+</div>
+<div class="card"><h2>Pending Proposals</h2>
+<table><thead><tr><th>ID</th><th>Description</th><th>Activation Epoch</th><th>Status</th></tr></thead><tbody id="prop-tbody"></tbody></table>
+</div>
+</div>
+<footer>ZENO PQ CHAIN &mdash; Chain ID 424242 &mdash; ML-DSA Secured</footer>
+<script src="/shared.js"></script>
+<script>
+async function load(){
+try{
+const g=await rpcCall('get_governance_state');
+const e=g.economics||{};
+document.getElementById('s-next').textContent=g.next_proposal_id||1;
+document.getElementById('s-treasury').textContent=((e.treasury_bps||0)/100).toFixed(1)+'%';
+document.getElementById('s-epoch').textContent=(e.epoch_length||100)+' blocks';
+document.getElementById('params').innerHTML=`
+<div class="detail-row"><div class="detail-label">Treasury Share</div><div class="detail-value">${((e.treasury_bps||0)/100).toFixed(1)}%</div></div>
+<div class="detail-row"><div class="detail-label">Epoch Length</div><div class="detail-value">${e.epoch_length||100} blocks</div></div>
+<div class="detail-row"><div class="detail-label">Minimum Self Bond</div><div class="detail-value">${formatNum(e.minimum_self_bond||0)} ZPQ</div></div>
+<div class="detail-row"><div class="detail-label">Unbonding Period</div><div class="detail-value">${e.unbonding_epochs||7} epochs</div></div>
+<div class="detail-row"><div class="detail-label">Downtime Slash</div><div class="detail-value">${((e.downtime_slash_bps||0)/100).toFixed(1)}%</div></div>
+<div class="detail-row"><div class="detail-label">Double Sign Slash</div><div class="detail-value">${((e.double_sign_slash_bps||0)/100).toFixed(1)}%</div></div>`;
+const tbody=document.getElementById('prop-tbody');
+const pending=g.pending||[];
+if(pending.length===0){tbody.innerHTML='<tr><td colspan="4" style="text-align:center;color:#555;padding:1.5rem">No pending proposals</td></tr>';}
+else{tbody.innerHTML='';pending.forEach(p=>{tbody.innerHTML+=`<tr><td>#${p.proposal_id}</td><td>${p.description}</td><td>${p.activation_epoch}</td><td><span class="badge">Pending</span></td></tr>`;});}
+}catch(e){document.getElementById('params').innerHTML='<p style="color:#555">Unable to connect</p>';}
+}
+load();setInterval(load,15000);
+</script></body></html>

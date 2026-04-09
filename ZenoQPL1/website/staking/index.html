@@ -1,0 +1,61 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Staking — Zeno</title><link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Orbitron:wght@700;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--primary:#00FFFF;--secondary:#7B61FF;--bg:#030311;--fg:#E0E0FF;--muted:#12121f;--border:#222238;--font-display:'Orbitron',sans-serif;--font-heading:'Space Grotesk',sans-serif;--font-body:'Exo 2',sans-serif;--font-mono:'JetBrains Mono',monospace}
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:var(--font-body);background:var(--bg);color:var(--fg);-webkit-font-smoothing:antialiased}a{color:var(--primary);text-decoration:none}
+nav{position:sticky;top:0;z-index:100;padding:.8rem 2rem;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(16px);background:rgba(3,3,17,.8);border-bottom:1px solid var(--border)}
+nav .logo{font-family:var(--font-display);font-size:.9rem;font-weight:700;letter-spacing:.15em;color:#fff;display:flex;align-items:center;gap:.5rem}nav .logo img{height:24px;filter:invert(1)}
+nav .links{display:flex;gap:1.5rem;font-size:.8rem}nav .links a{color:#666;transition:color .2s}nav .links a:hover{color:#fff}
+.container{max-width:1100px;margin:0 auto;padding:2rem}
+h1{font-family:var(--font-heading);font-size:1.8rem;font-weight:700;margin-bottom:.3rem}
+.sub{color:#666;font-size:.85rem;margin-bottom:2rem}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.8rem;margin-bottom:2rem}
+.stat{background:var(--muted);border:1px solid var(--border);border-radius:10px;padding:1.2rem}
+.stat h3{color:#555;font-size:.65rem;letter-spacing:.12em;text-transform:uppercase;margin-bottom:.2rem}
+.stat .val{font-family:var(--font-display);font-size:1.2rem;font-weight:700;color:#fff}
+.card{background:var(--muted);border:1px solid var(--border);border-radius:12px;padding:1.5rem;margin-bottom:1.2rem}
+.card h2{font-family:var(--font-heading);font-size:.9rem;font-weight:600;color:#888;margin-bottom:1rem;text-transform:uppercase;letter-spacing:.05em}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;color:#555;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;padding:.5rem .6rem;border-bottom:1px solid var(--border)}
+td{padding:.55rem .6rem;border-bottom:1px solid rgba(34,34,56,.3);font-size:.8rem;color:#888}
+.mono{font-family:var(--font-mono);font-size:.73rem}
+.badge{display:inline-block;padding:.1rem .4rem;border-radius:4px;font-size:.65rem;font-weight:600}
+.badge-ok{background:#064e3b;color:#34d399}
+.badge-jail{background:#7f1d1d;color:#f87171}
+.badge-inactive{background:#78350f;color:#fbbf24}
+.trunc{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:bottom}
+.info{background:rgba(0,255,255,.03);border:1px solid rgba(0,255,255,.1);border-radius:10px;padding:1.2rem;margin-top:1.5rem;font-size:.82rem;color:#777;line-height:1.6}
+footer{border-top:1px solid var(--border);padding:2rem;text-align:center;color:#333;font-size:.7rem;letter-spacing:.08em}
+</style></head><body>
+<nav><a href="/" class="logo"><img src="/logo.png" alt="Zeno" width="24" height="24">ZENO</a><div class="links"><a href="/">Home</a><a href="/explorer/">Explorer</a><a href="/docs/">Docs</a><a href="/faucet/">Faucet</a><a href="/governance/">Governance</a><a href="/api/">API</a><a href="/status/">Status</a></div></nav>
+<div class="container">
+<h1>Staking</h1>
+<p class="sub">Validator staking and delegation on Zeno PQ Chain</p>
+<div class="stats">
+<div class="stat"><h3>Current Epoch</h3><div class="val" id="s-epoch">—</div></div>
+<div class="stat"><h3>Validators</h3><div class="val" id="s-vals">—</div></div>
+<div class="stat"><h3>Treasury</h3><div class="val" id="s-treasury">—</div></div>
+<div class="stat"><h3>Min Self-Bond</h3><div class="val">1,000,000 ZPQ</div></div>
+</div>
+<div class="card"><h2>Validators</h2><table><thead><tr><th>Address</th><th>Self Bond</th><th>Total Stake</th><th>Commission</th><th>Status</th></tr></thead><tbody id="val-tbody"></tbody></table></div>
+<div class="info"><strong>Delegation:</strong> To delegate ZPQ to a validator, use the CLI: <code style="background:rgba(0,255,255,.06);padding:.1rem .3rem;border-radius:3px;font-family:var(--font-mono);font-size:.75rem;color:var(--primary)">zeno-cli wallet build-tx</code>. MetaMask-based delegation coming soon.<br><br><strong>Economics:</strong> Treasury receives 10% of all fees. Validators earn proportional rewards based on stake. Downtime slash: 1%. Double-sign slash: 5% + jail.</div>
+</div>
+<footer>ZENO PQ CHAIN &mdash; Chain ID 424242 &mdash; ML-DSA Secured</footer>
+<script src="/shared.js"></script>
+<script>
+async function load(){
+try{
+const state=await rpcCall('get_staking_state');
+document.getElementById('s-epoch').textContent=state.epoch||0;
+document.getElementById('s-treasury').textContent=formatNum(state.treasury_balance||0)+' ZPQ';
+const vals=Object.values(state.validators||{});
+document.getElementById('s-vals').textContent=vals.length;
+const tbody=document.getElementById('val-tbody');tbody.innerHTML='';
+vals.forEach(v=>{
+const status=v.status==='Active'?'<span class="badge badge-ok">Active</span>':v.status==='Jailed'?'<span class="badge badge-jail">Jailed</span>':'<span class="badge badge-inactive">Inactive</span>';
+tbody.innerHTML+=`<tr><td class="mono"><span class="trunc">${v.validator_address||'—'}</span></td><td>${formatNum(v.self_bond||0)}</td><td>${formatNum(v.total_stake||0)}</td><td>${((v.commission_bps||0)/100).toFixed(1)}%</td><td>${status}</td></tr>`;
+});
+if(vals.length===0)tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:#555;padding:1.5rem">No validators registered</td></tr>';
+}catch(e){document.getElementById('val-tbody').innerHTML='<tr><td colspan="5" style="text-align:center;color:#555;padding:1.5rem">Unable to connect to RPC</td></tr>';}
+}
+load();setInterval(load,10000);
+</script></body></html>

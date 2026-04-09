@@ -1,0 +1,116 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Documentation — Zeno</title><link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Orbitron:wght@700;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--primary:#00FFFF;--secondary:#7B61FF;--bg:#030311;--fg:#E0E0FF;--muted:#12121f;--border:#222238;--font-display:'Orbitron',sans-serif;--font-heading:'Space Grotesk',sans-serif;--font-body:'Exo 2',sans-serif;--font-mono:'JetBrains Mono',monospace}
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:var(--font-body);background:var(--bg);color:var(--fg);-webkit-font-smoothing:antialiased}a{color:var(--primary);text-decoration:none}
+nav{position:sticky;top:0;z-index:100;padding:.8rem 2rem;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(16px);background:rgba(3,3,17,.8);border-bottom:1px solid var(--border)}
+nav .logo{font-family:var(--font-display);font-size:.9rem;font-weight:700;letter-spacing:.15em;color:#fff;display:flex;align-items:center;gap:.5rem}
+nav .logo img{height:24px;filter:invert(1)}
+nav .links{display:flex;gap:1.5rem;font-size:.8rem}nav .links a{color:#666;transition:color .2s}nav .links a:hover{color:#fff}
+.container{max-width:1000px;margin:0 auto;padding:3rem 2rem}
+h1{font-family:var(--font-heading);font-size:2rem;font-weight:700;margin-bottom:.5rem}
+.subtitle{color:#666;margin-bottom:3rem;font-size:.95rem}
+.doc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1.2rem;margin-bottom:3rem}
+.doc-card{background:var(--muted);border:1px solid var(--border);border-radius:12px;padding:1.8rem;transition:border-color .3s}
+.doc-card:hover{border-color:rgba(0,255,255,.3)}
+.doc-card h3{font-family:var(--font-heading);font-size:1rem;font-weight:600;margin-bottom:.5rem}
+.doc-card p{font-size:.82rem;color:#666;line-height:1.6;margin-bottom:1rem}
+.doc-link{font-size:.8rem;color:var(--primary);font-weight:500}
+h2{font-family:var(--font-heading);font-size:1.3rem;font-weight:600;margin:2rem 0 1rem;padding-top:1rem;border-top:1px solid var(--border)}
+h3{font-family:var(--font-heading);font-size:1rem;font-weight:600;margin:1.5rem 0 .5rem}
+p,li{font-size:.88rem;color:#999;line-height:1.7}
+ul{padding-left:1.2rem;margin-bottom:1rem}
+code{font-family:var(--font-mono);background:var(--muted);padding:.15rem .4rem;border-radius:4px;font-size:.78rem;color:var(--primary)}
+pre{background:var(--muted);border:1px solid var(--border);border-radius:8px;padding:1.2rem;overflow-x:auto;margin:1rem 0;font-family:var(--font-mono);font-size:.78rem;line-height:1.7;color:#999}
+table{width:100%;border-collapse:collapse;margin:1rem 0;font-size:.82rem}
+th{text-align:left;color:#555;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;padding:.5rem .8rem;border-bottom:1px solid var(--border)}
+td{padding:.5rem .8rem;border-bottom:1px solid rgba(34,34,56,.4);color:#888}
+footer{border-top:1px solid var(--border);padding:2rem;text-align:center;color:#333;font-size:.7rem;letter-spacing:.08em}
+</style></head><body>
+<nav><a href="/" class="logo"><img src="/logo.png" alt="Zeno" width="24" height="24">ZENO</a><div class="links"><a href="/">Home</a><a href="/explorer/">Explorer</a><a href="/faucet/">Faucet</a><a href="/staking/">Staking</a><a href="/governance/">Governance</a><a href="/api/">API</a><a href="/status/">Status</a></div></nav>
+<div class="container">
+<h1>Documentation</h1>
+<p class="subtitle">Everything you need to understand and build on Zeno PQ Chain.</p>
+
+<div class="doc-grid">
+<div class="doc-card"><h3>Whitepaper</h3><p>Complete technical specification covering cryptography, consensus, economics, and architecture.</p><a class="doc-link" href="/Zeno_PQ_Chain_Whitepaper.pdf" download>Download PDF &darr;</a></div>
+<div class="doc-card"><h3>GitHub</h3><p>21 Rust crates, 94 tests, full source code. Clone, build, and run a validator.</p><a class="doc-link" href="https://github.com/CharlesStratusnet/Zeno-Final-Code" target="_blank">View Source &rarr;</a></div>
+<div class="doc-card"><h3>API Reference</h3><p>30+ JSON-RPC methods with full Ethereum compatibility.</p><a class="doc-link" href="/api/">API Docs &rarr;</a></div>
+</div>
+
+<h2>Quick Start</h2>
+<h3>Add Zeno to MetaMask</h3>
+<table><tr><td style="color:#555;width:180px">Network Name</td><td>Zeno PQ Chain</td></tr><tr><td style="color:#555">RPC URL</td><td id="rpcUrl">http://localhost:8000</td></tr><tr><td style="color:#555">Chain ID</td><td>424242</td></tr><tr><td style="color:#555">Currency Symbol</td><td>ZPQ</td></tr><tr><td style="color:#555">Block Explorer</td><td id="explorerUrl">/explorer/</td></tr></table>
+
+<h3>Run a Validator Node</h3>
+<pre>git clone https://github.com/CharlesStratusnet/Zeno-Final-Code.git
+cd Zeno-Final-Code/ZenoQPL1
+cargo build --bin zeno-cli --release
+./target/release/zeno-cli node init-solo --output ./devnet --chain-id zeno-mainnet
+RUST_LOG=info ./target/release/zeno-cli node start \
+  --config ./devnet/node-0/node.toml \
+  --genesis ./devnet/genesis.json</pre>
+
+<h3>Deploy a Smart Contract</h3>
+<p>Zeno is fully EVM compatible. Use Remix, Hardhat, or Foundry — just point to the Zeno RPC URL.</p>
+<pre>// hardhat.config.js
+module.exports = {
+  networks: {
+    zeno: {
+      url: "https://rpc.zenopq.com",
+      chainId: 424242,
+    }
+  }
+};</pre>
+
+<h3>Verify a Post-Quantum Signature in Solidity</h3>
+<pre>function verifyPQ(
+    bytes memory pubKey,
+    bytes memory message,
+    bytes memory signature
+) public view returns (bool) {
+    bytes memory input = abi.encode(pubKey, message, signature);
+    (bool ok, bytes memory result) = address(0x10001).staticcall(input);
+    return ok && result[31] == 0x01;
+}</pre>
+
+<h2>Architecture</h2>
+<p>Zeno is a Rust workspace with 21 crates organised into four planes:</p>
+<table>
+<thead><tr><th>Plane</th><th>Crates</th><th>Responsibility</th></tr></thead>
+<tbody>
+<tr><td>Consensus</td><td><code>zeno-consensus</code>, <code>zeno-mempool</code></td><td>Block proposal, BFT voting, finality, WAL, slashing</td></tr>
+<tr><td>Execution</td><td><code>zeno-execution</code>, <code>zeno-evm</code>, <code>zeno-zk</code></td><td>Transaction validation, EVM, ZK privacy</td></tr>
+<tr><td>Network</td><td><code>zeno-network</code></td><td>TCP P2P, peer scoring, block sync</td></tr>
+<tr><td>Operations</td><td><code>zeno-rpc</code></td><td>JSON-RPC, explorer, faucet, staking UI</td></tr>
+</tbody></table>
+
+<h2>Precompile Addresses</h2>
+<table>
+<thead><tr><th>Address</th><th>Function</th><th>Gas</th></tr></thead>
+<tbody>
+<tr><td><code>0x10001</code></td><td>ML-DSA signature verification</td><td>5,000</td></tr>
+<tr><td><code>0x10002</code></td><td>BLAKE3 hash</td><td>50 + 6/word</td></tr>
+<tr><td><code>0x10003</code></td><td>ZK proof verification</td><td>100,000</td></tr>
+<tr><td><code>0x02</code></td><td>SHA-256</td><td>60 + 12/word</td></tr>
+<tr><td><code>0x04</code></td><td>Identity (data copy)</td><td>15 + 3/word</td></tr>
+</tbody></table>
+
+<h2>Network Parameters</h2>
+<table>
+<thead><tr><th>Parameter</th><th>Value</th></tr></thead>
+<tbody>
+<tr><td>Chain ID</td><td>424242</td></tr>
+<tr><td>Block time</td><td>~2.5 seconds</td></tr>
+<tr><td>Finality</td><td>Instant (single-slot BFT)</td></tr>
+<tr><td>Max block size</td><td>2 MB</td></tr>
+<tr><td>Max gas per block</td><td>30,000,000</td></tr>
+<tr><td>Signature algorithm</td><td>ML-DSA-65 (FIPS 204)</td></tr>
+<tr><td>Hash function</td><td>BLAKE3</td></tr>
+<tr><td>EVM spec</td><td>Cancun</td></tr>
+<tr><td>Mempool capacity</td><td>10,000 txs</td></tr>
+<tr><td>Min fee (native)</td><td>1 ZPQ</td></tr>
+<tr><td>Min fee (EVM)</td><td>10 ZPQ</td></tr>
+</tbody></table>
+</div>
+<footer>ZENO PQ CHAIN &mdash; Chain ID 424242 &mdash; ML-DSA Secured</footer>
+</body></html>

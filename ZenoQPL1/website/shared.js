@@ -1,5 +1,5 @@
 // Shared configuration and utilities for all Zeno sub-pages.
-const RPC_URL = window.ZENO_RPC || 'http://localhost:8000';
+const RPC_URL = window.ZENO_RPC || window.location.origin;
 
 async function rpcCall(method, params = []) {
   const resp = await fetch(RPC_URL, {
